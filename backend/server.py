@@ -20,7 +20,11 @@ from fastapi.responses import PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError
+from fastapi.responses import Response
+from collections import deque
 import hashlib
+import hmac
+import time
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
@@ -57,6 +61,18 @@ class FAQ(BaseModel):
     a: str
 
 
+class QuickReply(BaseModel):
+    label: str
+    text: str
+
+
+DEFAULT_QUICK = [
+    {"label": "Prices", "text": "Our prices start from $__. Tell me what you're interested in and I'll send exact details!"},
+    {"label": "Address", "text": "You can find us at: __ (street, city). See you soon!"},
+    {"label": "Opening hours", "text": "We're open Mon–Sat, 9:00–18:00. Sunday closed."},
+]
+
+
 class Settings(BaseModel):
     business_name: str = "My Business"
     business_type: str = "generic"
@@ -70,6 +86,8 @@ class Settings(BaseModel):
     telegram_token: str = ""
     fb_page_token: str = ""
     fb_verify_token: str = ""
+    fb_app_secret: str = ""
+    quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])
 
 
 class PublicChatIn(BaseModel):
@@ -261,10 +279,27 @@ async def public_info():
     return {"business_name": s.business_name, "greeting": s.greeting}
 
 
+RATE = {}
+
+
+def rate_ok(key: str, limit: int, window: int) -> bool:
+    now = time.time()
+    q = RATE.setdefault(key, deque())
+    while q and q[0] < now - window:
+        q.popleft()
+    if len(q) >= limit:
+        return False
+    q.append(now)
+    return True
+
+
 @api.post("/public/chat")
-async def public_chat(body: PublicChatIn):
+async def public_chat(body: PublicChatIn, request: Request):
     if not body.text.strip():
         raise HTTPException(400, "Empty message")
+    ip = (request.headers.get("x-forwarded-for") or request.client.host).split(",")[0].strip()
+    if not (rate_ok(f"s:{body.session_id}", 6, 60) and rate_ok(f"ip:{ip}", 20, 60) and rate_ok(f"iph:{ip}", 150, 3600)):
+        raise HTTPException(429, "You're sending messages too fast. Please wait a moment and try again.")
     msg = await handle_incoming("web", body.session_id, body.name or "Website visitor", body.text.strip())
     return {"reply": msg}
 
@@ -308,7 +343,12 @@ async def messenger_verify(request: Request):
 
 @api.post("/webhooks/messenger")
 async def messenger_webhook(request: Request, bg: BackgroundTasks):
-    data = await request.json()
+    raw = await request.body()
+    s = await get_settings()
+    expected = "sha256=" + hmac.new(s.fb_app_secret.encode(), raw, hashlib.sha256).hexdigest()
+    if not s.fb_app_secret or not hmac.compare_digest(request.headers.get("X-Hub-Signature-256", ""), expected):
+        raise HTTPException(403, "Invalid signature")
+    data = json.loads(raw)
     for entry in data.get("entry", []):
         for ev in entry.get("messaging", []):
             text = (ev.get("message") or {}).get("text")
@@ -428,7 +468,70 @@ async def channels_status(user=Depends(current_user)):
             tg["bot"] = me_r.get("result", {}).get("username")
         except Exception:
             pass
-    return {"telegram": tg, "messenger": {"configured": bool(s.fb_page_token and s.fb_verify_token)}}
+    return {"telegram": tg, "messenger": {"configured": bool(s.fb_page_token and s.fb_verify_token and s.fb_app_secret)}}
+
+
+WIDGET_JS = r"""(function(){
+  if (window.__replyflow) return; window.__replyflow = 1;
+  var s = document.currentScript, origin = new URL(s.src).origin;
+  var color = (s.getAttribute('data-color') || '#10B981');
+  var side = s.getAttribute('data-position') === 'left' ? 'left' : 'right';
+  function init(){
+    var f = document.createElement('iframe');
+    f.src = origin + '/embed?site=' + encodeURIComponent(location.hostname);
+    f.title = 'Chat'; f.allow = 'clipboard-write';
+    f.style.cssText = 'position:fixed;bottom:92px;' + side + ':20px;width:370px;max-width:calc(100vw - 40px);height:540px;max-height:calc(100vh - 120px);border:0;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);z-index:2147483646;display:none;background:#0F1522';
+    var b = document.createElement('button');
+    b.setAttribute('aria-label', 'Open chat'); b.id = 'replyflow-bubble';
+    b.style.cssText = 'position:fixed;bottom:20px;' + side + ':20px;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;background:' + color + ';color:#0B0F17;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:2147483647;display:flex;align-items:center;justify-content:center;transition:transform .2s';
+    var chat = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>';
+    var close = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    b.innerHTML = chat;
+    b.onmouseenter = function(){ b.style.transform = 'scale(1.06)'; };
+    b.onmouseleave = function(){ b.style.transform = 'none'; };
+    b.onclick = function(){ var open = f.style.display === 'none'; f.style.display = open ? 'block' : 'none'; b.innerHTML = open ? close : chat; };
+    document.body.appendChild(f); document.body.appendChild(b);
+  }
+  if (document.body) init(); else document.addEventListener('DOMContentLoaded', init);
+})();"""
+
+
+@api.get("/widget.js")
+async def widget_js():
+    return Response(WIDGET_JS, media_type="application/javascript", headers={"Cache-Control": "public, max-age=300"})
+
+
+SUMMARY_PROMPT = (
+    "Analyse this customer conversation for the business owner. Respond ONLY with a JSON object with keys: "
+    '"intent" (what the customer wants, max 5 words), "summary" (1-2 short sentences), '
+    '"stage" (one of: "New lead", "Hot lead", "Question", "Support", "Complaint", "Resolved"), '
+    '"details" (array of up to 4 short key facts like product, budget, location, date, contact - only if mentioned), '
+    '"next_step" (one short recommended action for the business). Write in the same language as the customer.'
+)
+
+
+@api.post("/conversations/{cid}/summary")
+async def conv_summary(cid: str, force: bool = False, user=Depends(current_user)):
+    conv = await load_conv(cid)
+    count = await db.messages.count_documents({"conversation_id": cid})
+    if not force and conv.get("summary") and conv.get("summary_count") == count:
+        return conv["summary"]
+    if not await db.messages.count_documents({"conversation_id": cid, "role": "user"}):
+        return None
+    s = await get_settings()
+    t = await transcript(cid, 40)
+    raw = await llm(s, f"You are a sales & support analyst for '{s.business_name}'. Business info: {s.business_info or '(not provided)'}",
+                    f"{SUMMARY_PROMPT}\n\nConversation:\n{t}")
+    m = re.search(r"\{.*\}", raw, re.S)
+    try:
+        data = json.loads(m.group(0)) if m else {}
+    except json.JSONDecodeError:
+        data = {}
+    summary = {"intent": str(data.get("intent", ""))[:60], "summary": str(data.get("summary", raw))[:400],
+               "stage": str(data.get("stage", "Question")), "details": [str(d) for d in data.get("details", [])][:4],
+               "next_step": str(data.get("next_step", "")), "updated_at": now_iso()}
+    await db.conversations.update_one({"id": cid}, {"$set": {"summary": summary, "summary_count": count}})
+    return summary
 
 
 app.include_router(api)

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import Embed from "@/pages/Embed";
 
 const Protected = ({ children }) => {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/embed" element={<Embed />} />
           <Route path="/dashboard/*" element={<Protected><Dashboard /></Protected>} />
         </Routes>
       </BrowserRouter>

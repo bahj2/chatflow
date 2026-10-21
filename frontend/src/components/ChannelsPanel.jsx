@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Copy, Send, Facebook, Globe, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { Copy, Send, Facebook, Globe, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, BACKEND_URL } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Section, Field } from "@/components/SettingsPanel";
+
+const embedCode = `<script src="${BACKEND_URL}/api/widget.js" async></script>`;
 
 const CopyBox = ({ value, testid }) => (
   <div className="flex gap-2">
@@ -66,16 +68,22 @@ export default function ChannelsPanel() {
         <Section title={<Head Icon={Facebook} color="#0084FF" name="Messenger" />} desc="In Meta for Developers: create an app → add Messenger → generate a Page access token → set the webhook below with your verify token, subscribe to 'messages'.">
           <Status ok={st?.messenger.configured} label="Configured" />
           <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger`} testid="messenger-callback-url" /></Field>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <Field label="Page access token"><Input type="password" value={s.fb_page_token} onChange={set("fb_page_token")} data-testid="fb-page-token-input" /></Field>
-            <Field label="Verify token (any secret word you choose)"><Input value={s.fb_verify_token} onChange={set("fb_verify_token")} data-testid="fb-verify-token-input" /></Field>
+            <Field label="App secret (App settings → Basic)"><Input type="password" value={s.fb_app_secret} onChange={set("fb_app_secret")} data-testid="fb-app-secret-input" /></Field>
+            <Field label="Verify token (any secret word)"><Input value={s.fb_verify_token} onChange={set("fb_verify_token")} data-testid="fb-verify-token-input" /></Field>
           </div>
+          <p className="text-xs text-slate-500 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Every incoming message is checked with your App secret — fake messages are rejected.</p>
           <Btn which="messenger" label="Save" />
         </Section>
 
-        <Section title={<Head Icon={Globe} color="#10B981" name="Website chat" />} desc="Already live on your landing page — the chat bubble in the corner.">
+        <Section title={<Head Icon={Globe} color="#10B981" name="Website chat" />} desc="Live on your landing page. Add the same chat bubble to any other website (WordPress, Shopify, Wix, Tilda, plain HTML).">
           <Status ok label="Active" />
-          <Field label="Your website"><CopyBox value={window.location.origin} testid="website-url" /></Field>
+          <Field label="Embed code — paste before </body> on your website"><CopyBox value={embedCode} testid="embed-code" /></Field>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <span>Options: <code className="font-mono text-slate-300">data-color="#hex"</code> · <code className="font-mono text-slate-300">data-position="left"</code></span>
+            <a href="/embed" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300" data-testid="embed-preview-link">Preview chat window</a>
+          </div>
         </Section>
       </div>
     </div>

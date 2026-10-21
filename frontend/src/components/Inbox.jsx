@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, Sparkles, ArrowUp, Bot, User, Headphones, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, Sparkles, ArrowUp, Bot, User, Headphones, ArrowLeft, Loader2, Zap } from "lucide-react";
+import { SummaryPanel, SummaryStrip } from "@/components/CustomerSummary";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/auth";
 import { ChannelBadge } from "@/components/ChannelBadge";
@@ -37,6 +38,7 @@ const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ }) => (
           <div className="flex items-center gap-2 mt-1.5">
             <ChannelBadge channel={c.channel} compact />
             <span className="text-xs text-slate-400 truncate flex-1">{c.last_message}</span>
+            {c.summary?.intent && <span className="hidden sm:inline shrink-0 max-w-[110px] truncate text-[10px] font-semibold text-amber-300" data-testid={`conversation-intent-${c.id}`}>{c.summary.intent}</span>}
             {c.unread > 0 && <span className="h-5 min-w-5 px-1.5 rounded-full bg-emerald-500 text-slate-950 text-[11px] font-bold grid place-items-center">{c.unread}</span>}
           </div>
         </button>
@@ -66,7 +68,17 @@ const Bubble = ({ m }) => {
   );
 };
 
-const Composer = ({ conv, onSent }) => {
+const QuickReplies = ({ items, onSend, disabled }) => (
+  <div className="flex gap-2 overflow-x-auto pb-1" data-testid="quick-replies">
+    <span className="shrink-0 self-center text-[10px] font-mono uppercase tracking-widest text-slate-500 flex items-center gap-1"><Zap className="h-3 w-3" />Quick</span>
+    {items.map((q, i) => (
+      <button key={i} onClick={() => onSend(q.text)} disabled={disabled} title={q.text} data-testid={`quick-reply-${i}`}
+        className="shrink-0 rounded-full border border-indigo-400/30 bg-indigo-500/10 text-indigo-200 px-3 py-1.5 text-xs font-medium hover:bg-indigo-500/25 transition-colors disabled:opacity-50">{q.label}</button>
+    ))}
+  </div>
+);
+
+const Composer = ({ conv, onSent, quick }) => {
   const [text, setText] = useState("");
   const [sugs, setSugs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -92,6 +104,7 @@ const Composer = ({ conv, onSent }) => {
 
   return (
     <div className="border-t border-white/5 p-4 space-y-3 bg-[#0D121C]">
+      {quick.length > 0 && <QuickReplies items={quick} onSend={send} disabled={sending} />}
       <div className="flex flex-wrap gap-2 items-start">
         <button onClick={suggest} disabled={loading} data-testid="ai-suggest-btn"
           className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-amber-400/20 transition-colors disabled:opacity-60">
@@ -114,9 +127,25 @@ const Composer = ({ conv, onSent }) => {
   );
 };
 
-const ChatView = ({ conv, onBack, onChange }) => {
+const ChatView = ({ conv, onBack, onChange, quick }) => {
   const [msgs, setMsgs] = useState([]);
+  const [summary, setSummary] = useState(conv.summary || null);
+  const [sumLoading, setSumLoading] = useState(false);
   const end = useRef(null);
+
+  const loadSummary = async (force = false) => {
+    setSumLoading(true);
+    try {
+      const { data } = await api.post(`/conversations/${conv.id}/summary`, null, { params: { force } });
+      setSummary(data);
+    } catch (e) { if (force) toast.error(errMsg(e)); } finally { setSumLoading(false); }
+  };
+  useEffect(() => { setSummary(conv.summary || null); }, [conv.id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!msgs.length) return;
+    const t = setTimeout(() => loadSummary(), 1500);
+    return () => clearTimeout(t);
+  }, [msgs.length, conv.id]);  // eslint-disable-line react-hooks/exhaustive-deps
   const load = () => api.get(`/conversations/${conv.id}/messages`).then((r) => setMsgs(r.data));
 
   useEffect(() => {
@@ -137,8 +166,9 @@ const ChatView = ({ conv, onBack, onChange }) => {
   };
 
   return (
-    <div className="flex flex-col h-full min-w-0" data-testid="chat-view">
-      <div className="flex items-center gap-3 px-5 h-16 border-b border-white/5">
+    <div className="flex h-full min-w-0">
+    <div className="flex flex-col h-full min-w-0 flex-1" data-testid="chat-view">
+      <div className="flex items-center gap-3 px-5 h-16 shrink-0 border-b border-white/5">
         <button onClick={onBack} className="md:hidden text-slate-400" data-testid="chat-back-btn"><ArrowLeft className="h-5 w-5" /></button>
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate" data-testid="chat-contact-name">{conv.name}</p>
@@ -150,10 +180,13 @@ const ChatView = ({ conv, onBack, onChange }) => {
           <Switch checked={conv.ai_enabled} onCheckedChange={toggleAI} data-testid="ai-toggle-switch" />
         </label>
       </div>
+      <SummaryStrip summary={summary} loading={sumLoading} />
       <div ref={end} className="flex-1 overflow-y-auto p-5 space-y-4">
         {msgs.map((m) => <Bubble key={m.id} m={m} />)}
       </div>
-      <Composer conv={conv} onSent={load} />
+      <Composer conv={conv} onSent={load} quick={quick} />
+    </div>
+    <SummaryPanel summary={summary} loading={sumLoading} onRefresh={() => loadSummary(true)} />
     </div>
   );
 };
@@ -163,6 +196,9 @@ export default function Inbox() {
   const [active, setActive] = useState(null);
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
+  const [quick, setQuick] = useState([]);
+
+  useEffect(() => { api.get("/settings").then((r) => setQuick((r.data.quick_replies || []).filter((x) => x.label && x.text))); }, []);
 
   useEffect(() => {
     const load = () => api.get("/conversations", { params: { channel: filter, q: q || undefined } }).then((r) => setConvs(r.data));
@@ -177,7 +213,7 @@ export default function Inbox() {
         <ConvList convs={convs} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} />
       </div>
       <div className={`${active ? "" : "hidden md:grid place-items-center"} min-h-0 min-w-0 h-full`}>
-        {active ? <ChatView conv={active} onBack={() => setActive(null)} onChange={setActive} />
+        {active ? <ChatView conv={active} onBack={() => setActive(null)} onChange={setActive} quick={quick} />
           : <p className="text-slate-500 text-sm" data-testid="no-chat-selected">Select a conversation to view it</p>}
       </div>
     </div>

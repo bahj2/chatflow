@@ -55,6 +55,7 @@ export default function SettingsPanel() {
 
   const set = (k) => (v) => setS({ ...s, [k]: v?.target ? v.target.value : v });
   const setFaq = (i, k, v) => setS({ ...s, faqs: s.faqs.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
+  const setQr = (i, k, v) => setS({ ...s, quick_replies: s.quick_replies.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
   const save = async () => {
     setSaving(true);
     try { await api.put("/settings", s); toast.success("Settings saved"); } catch (e) { toast.error(errMsg(e)); } finally { setSaving(false); }
@@ -98,6 +99,20 @@ export default function SettingsPanel() {
           ))}
           <button onClick={() => setS({ ...s, faqs: [...s.faqs, { q: "", a: "" }] })} data-testid="add-faq-btn"
             className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
+        </Section>
+
+        <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
+          {s.quick_replies.map((r, i) => (
+            <div key={i} className="rounded-xl border border-white/10 bg-[#0F1522] p-4 space-y-2" data-testid={`quick-item-${i}`}>
+              <div className="flex gap-2">
+                <Input value={r.label} onChange={(e) => setQr(i, "label", e.target.value)} placeholder="Button label, e.g. Prices" data-testid={`quick-label-${i}`} />
+                <button onClick={() => setS({ ...s, quick_replies: s.quick_replies.filter((_, j) => j !== i) })} data-testid={`quick-delete-${i}`} className="text-slate-500 hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              <Textarea rows={2} value={r.text} onChange={(e) => setQr(i, "text", e.target.value)} placeholder="Message that will be sent" data-testid={`quick-text-${i}`} />
+            </div>
+          ))}
+          <button onClick={() => setS({ ...s, quick_replies: [...s.quick_replies, { label: "", text: "" }] })} data-testid="add-quick-btn"
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
         </Section>
 
         <Section title="AI behaviour" desc="Model, tone and language for every reply.">

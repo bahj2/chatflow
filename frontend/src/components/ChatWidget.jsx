@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, ArrowUp } from "lucide-react";
-import { api } from "@/lib/auth";
+import { api, errMsg } from "@/lib/auth";
 
 const sessionId = () => {
   let s = localStorage.getItem("rf_web_session");
@@ -17,7 +17,7 @@ export const Typing = () => (
   </div>
 );
 
-export const ChatPanel = ({ className = "", onClose }) => {
+export const ChatPanel = ({ className = "", onClose, visitorName = "Website visitor" }) => {
   const [info, setInfo] = useState({ business_name: "", greeting: "" });
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
@@ -44,10 +44,11 @@ export const ChatPanel = ({ className = "", onClose }) => {
     setMsgs((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", text: t }]);
     setBusy(true);
     try {
-      await api.post("/public/chat", { session_id: sid.current, text: t });
+      await api.post("/public/chat", { session_id: sid.current, text: t, name: visitorName });
       await load();
-    } catch {
-      setMsgs((m) => [...m, { id: `err-${Date.now()}`, role: "ai", text: "Sorry, something went wrong. Please try again." }]);
+    } catch (e) {
+      const text = e?.response?.status === 429 ? errMsg(e) : "Sorry, something went wrong. Please try again.";
+      setMsgs((m) => [...m, { id: `err-${Date.now()}`, role: "ai", text }]);
     } finally {
       setBusy(false);
     }
