@@ -59,6 +59,12 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - One-line setup guides in AI Settings; POST /api/voice/voxcpm-check; /voice/test returns vox_error; https + public-IP rule for VoxCPM2 URL
 - Contract verified with fake model (scripts/fake_voxcpm_test.py); iteration_8 pass. Real GPU run NOT tested (no GPU here); HF official Space was in RUNTIME_ERROR
 
+## Iteration 8 (2026-06) — Easy VoxCPM2 auto-connect
+- User found Colab steps confusing → 4-card wizard (VoxAutoConnect.jsx): Open Colab (code auto-copied, contains pairing token T) → turn on T4 GPU → Ctrl+V + ▶ → live status; EN/ខ្មែរ switch (localStorage rf_setup_lang); Modal + manual URL/key under "Advanced"
+- Backend: db.voxcpm_pairs {business_id, token, stage, source, url, gpu, error, seen_at}; GET /api/voice/voxcpm-pair (auth); public POST /api/voice/voxcpm-pair/{token} (stages; ready → health-check + auto-save voxcpm_url/key; alive heartbeat every 5 min; colab >15 min silent → "offline")
+- colab_setup.py / modal_setup.py report progress; re-running the same cell reconnects automatically. iteration_9 pass (100%). Real GPU run still NOT tested
+
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

@@ -1,0 +1,24 @@
+{
+  "summary": "Tested VoxCPM2 easy 3-step auto-connect (pairing backend + VoxAutoConnect wizard UI) plus Voice settings regressions. Backend: 22/22 new pytest cases pass (plus 11/11 iter8 voxcpm regression). Frontend: all requested flows verified via Playwright on desktop 1920 and mobile 390 — steps 1-4, Open Colab copies exact setup line + opens colab tab, live status updates (installing/loading/no_gpu amber/error red+text/ready) within polling window, connected toast, GPU line, all steps checked, Advanced shows mock url, Check connection OK, main Save keeps voxcpm_url, EN/KM switch persists after reload, no horizontal overflow at 390px. Mock tunnel was reachable. Admin settings voxcpm_url/key reset to '' afterwards (pair view = waiting).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings > Voice > Advanced toggle (mobile 390px)", "issues": ["When the Advanced label wraps to 2 lines it is center-aligned (button default text-center); add text-left to vox-advanced-toggle"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter9_vox_autoconnect.py", "/app/test_reports/pytest/pytest_iter9.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "usePair only syncs voxcpm_url/key into form state on a non-ready -> ready transition. If a re-run reports ready with a NEW url while the page last saw 'ready' (polling is 30s when ready, so a fast re-pair could be missed), form state keeps the old url and pressing Save would overwrite the new server url. Consider syncing whenever data.url !== s.voxcpm_url while stage is ready.",
+    "POST /api/voice/voxcpm-pair/{token} rate limit is 120/hour per IP; fine for one Colab (alive every 5 min), but multiple tenants behind one NAT/Colab egress IP could share the bucket — low risk.",
+    "Optional text-left on CollapsibleTrigger for wrapped label."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter9_vox_autoconnect.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Admin voxcpm_pairs doc stage was set to 'ready' with mock url during testing; settings voxcpm_url/key reset to '' so pair view shows 'waiting'. loadtest+706ab4fd business got a pair token created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login submit testid is login-submit-btn. Simulate Colab by POSTing stages to /api/voice/voxcpm-pair/{token}. Mock VoxCPM2 tunnel https://louisiana-cancel-thickness-eddie.trycloudflare.com key mockkey123. Main save button testid settings-save-btn/save-settings-btn (first match worked)."
+}

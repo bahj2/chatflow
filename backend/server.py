@@ -930,7 +930,7 @@ async def voxcpm_pair(user=Depends(current_user)):
 
 @api.post("/voice/voxcpm-pair/{token}")
 async def voxcpm_pair_report(token: str, body: VoxPairIn, request: Request):
-    if not rate_ok([(f"vpair:{client_ip(request)}", 120, 3600)]):
+    if not rate_ok([(f"vpair:{token[:64]}", 120, 3600), (f"vpairip:{client_ip(request)}", 2000, 3600)]):
         raise HTTPException(429, "Too many requests. Try again later.")
     p = await db.voxcpm_pairs.find_one({"token": token}, {"_id": 0})
     if not p:

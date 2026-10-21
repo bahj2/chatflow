@@ -72,14 +72,15 @@ const usePair = (setS, t) => {
       try {
         const { data } = await api.get("/voice/voxcpm-pair");
         if (!alive) return;
-        if (prev.current && prev.current !== "ready" && data.stage === "ready") {
+        const last = prev.current;
+        if (last && data.stage === "ready" && (last.stage !== "ready" || last.url !== data.url)) {
           setS((x) => ({ ...x, voxcpm_url: data.url, voxcpm_key: data.key }));
           toast.success(t.connected);
         }
-        prev.current = data.stage;
+        prev.current = data;
         setP(data);
       } catch { /* retry on next tick */ }
-      if (alive) timer = setTimeout(tick, prev.current === "ready" ? 30000 : 4000);
+      if (alive) timer = setTimeout(tick, prev.current?.stage === "ready" ? 30000 : 4000);
     };
     tick();
     return () => { alive = false; clearTimeout(timer); };
@@ -206,7 +207,7 @@ const Advanced = ({ s, setS, Field, p, t }) => {
   const line = setupLine("modal_setup.py", p.token);
   return (
     <Collapsible>
-      <CollapsibleTrigger data-testid="vox-advanced-toggle" className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-semibold text-slate-400 hover:text-slate-200">
+      <CollapsibleTrigger data-testid="vox-advanced-toggle" className="group flex w-full items-center justify-between gap-2 rounded-lg px-1 py-2 text-left text-xs font-semibold text-slate-400 hover:text-slate-200">
         {t.advanced}<ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-4 pt-2" data-testid="vox-advanced-content">
