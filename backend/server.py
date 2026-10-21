@@ -581,7 +581,7 @@ async def public_chat(bid: str, body: PublicChatIn, request: Request):
 
 
 @api.post("/public/{bid}/voice")
-async def public_voice(bid: str, request: Request, session_id: str = Form(..., max_length=100), name: str = Form("Website visitor"),
+async def public_voice(bid: str, request: Request, bg: BackgroundTasks, session_id: str = Form(..., max_length=100), name: str = Form("Website visitor"),
                        file: UploadFile = File(...)):
     bid = await resolve_bid(bid)
     ip = client_ip(request)
@@ -590,7 +590,8 @@ async def public_voice(bid: str, request: Request, session_id: str = Form(..., m
     data = await file.read()
     if not data or len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Voice message must be under 10 MB")
-    return {"reply": await handle_incoming(bid, "web", session_id, name[:80], "", audio=data)}
+    bg.add_task(handle_incoming, bid, "web", session_id, name[:80], "", audio=data)  # voice replies can take > 60 s; widget polls
+    return {"accepted": True}
 
 
 @api.get("/public/{bid}/chat/{session_id}")
@@ -831,12 +832,21 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=
         raise HTTPException(400, "Voice sample must be under 10 MB")
     try:
         wav = await M.to_wav16k(data)
+        secs = M.wav_seconds(wav)
     except Exception:
         raise HTTPException(400, "Could not read this audio file")
+    if not 5 <= secs <= 30.5:
+        raise HTTPException(400, f"The sample is {secs:.0f} seconds. Please use 5–30 seconds of clear speech.")
     doc = await M.save_media(db, user["business_id"], wav, "audio/wav", "seller_voice")
     text = text.strip() or await M.transcribe(await M.to_mp3(data))
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"seller_voice_media_id": doc["id"], "seller_voice_text": text}})
-    return {"media_id": doc["id"], "text": text}
+    return {"media_id": doc["id"], "text": text, "seconds": round(secs, 1)}
+
+
+@api.delete("/settings/seller-voice")
+async def delete_seller_voice(user=Depends(current_user)):
+    await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"seller_voice_media_id": "", "seller_voice_text": ""}})
+    return {"ok": True}
 
 
 @api.post("/voice/test")
@@ -845,7 +855,7 @@ async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     if body.voice:
         s = s.model_copy(update={"voice": body.voice})
     try:
-        audio, engine = await M.speak(db, s, body.text[:500])
+        audio, engine = await M.speak(db, s, body.text[:500], timeout=50)  # stay under the 60 s proxy limit
     except Exception as e:
         logger.warning("voice test failed: %s", e)
         if M.KHMER.search(body.text):

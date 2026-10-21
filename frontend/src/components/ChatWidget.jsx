@@ -68,6 +68,16 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
     }
   };
 
+  const waitForReply = async (base) => {
+    for (let i = 0; i < 45; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const { data } = await api.get(`/public/${businessId}/chat/${sid.current}`);
+      const last = data.messages[data.messages.length - 1];
+      if (data.messages.length >= base + 2 && last?.role !== "user") return setMsgs(data.messages);
+    }
+    await load();
+  };
+
   const sendVoice = async () => {
     const blob = await rec.stop();
     if (!blob || blob.size < 1200) return;
@@ -78,8 +88,9 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
     fd.append("name", visitorName);
     fd.append("file", blob, blobName(blob));
     try {
+      const base = (await api.get(`/public/${businessId}/chat/${sid.current}`)).data.messages.length;
       await api.post(`/public/${businessId}/voice`, fd);
-      await load();
+      await waitForReply(base);
     } catch (e) {
       const text = e?.response?.status === 429 ? errMsg(e) : "Sorry, I couldn't hear that. Please try again.";
       setMsgs((m) => [...m, { id: `err-${Date.now()}`, role: "ai", text }]);

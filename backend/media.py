@@ -1,11 +1,13 @@
 import asyncio
 import base64
+import io
 import json
 import os
 import re
 import subprocess
 import tempfile
 import uuid
+import wave
 from datetime import datetime, timezone
 
 import edge_tts
@@ -150,14 +152,25 @@ async def voxcpm_tts(s, text: str, ref_wav: bytes) -> bytes:
 
 HF_VOXCPM = "https://openbmb-voxcpm-demo.hf.space"
 HF_VOICE = "A warm, friendly young woman"
-HF_TIMEOUT = 45
+HF_TIMEOUT = 60
 
 
-async def hf_voxcpm(text: str) -> bytes:
-    """Khmer speech from the free official VoxCPM2 Hugging Face demo (voice design, no cloning)."""
+def wav_seconds(wav: bytes) -> float:
+    with wave.open(io.BytesIO(wav)) as w:
+        return w.getnframes() / float(w.getframerate())
+
+
+async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeout: float = HF_TIMEOUT) -> bytes:
+    """Khmer speech from the free official VoxCPM2 Hugging Face demo: seller-voice clone if a sample is given, else the default voice."""
     async def run():
-        async with httpx.AsyncClient(timeout=HF_TIMEOUT) as h:
-            r = await h.post(f"{HF_VOXCPM}/gradio_api/call/generate", json={"data": [text, HF_VOICE, None, False, "", 2.0, False, False]})
+        async with httpx.AsyncClient(timeout=timeout) as h:
+            ref, clone_text = None, ""
+            if ref_wav:
+                up = await h.post(f"{HF_VOXCPM}/gradio_api/upload", files={"files": ("seller.wav", ref_wav, "audio/wav")})
+                up.raise_for_status()
+                ref, clone_text = {"path": up.json()[0], "meta": {"_type": "gradio.FileData"}}, ref_text.strip()
+            data = [text, "" if ref else HF_VOICE, ref, bool(clone_text), clone_text, 2.0, False, False]
+            r = await h.post(f"{HF_VOXCPM}/gradio_api/call/generate", json={"data": data})
             r.raise_for_status()
             eid, event = r.json()["event_id"], None
             async with h.stream("GET", f"{HF_VOXCPM}/gradio_api/call/generate/{eid}") as s:
@@ -174,13 +187,21 @@ async def hf_voxcpm(text: str) -> bytes:
                         a.raise_for_status()
                         return a.content
             raise RuntimeError("VoxCPM2 demo returned no audio")
-    return await to_mp3(await asyncio.wait_for(run(), HF_TIMEOUT))
+    return await to_mp3(await asyncio.wait_for(run(), timeout))
 
 
-async def speak(db, s, text: str) -> tuple:
+async def speak(db, s, text: str, timeout: float = HF_TIMEOUT) -> tuple:
     """Returns (mp3_bytes, engine). Khmer uses only the HF VoxCPM2 demo and raises if it is down (caller sends text only)."""
     text = EMOJI.sub("", text).strip()
     if KHMER.search(text):
-        return await hf_voxcpm(text), "voxcpm2-hf"
+        ref = None
+        if s.seller_voice_media_id:
+            try:
+                ref, _ = await load_media(db, s.seller_voice_media_id)
+            except Exception as e:
+                print(f"Seller voice sample unavailable, using default voice: {e}")
+        if ref:
+            return await hf_voxcpm(text, ref, s.seller_voice_text, timeout), "voxcpm2-hf-clone"
+        return await hf_voxcpm(text, timeout=timeout), "voxcpm2-hf"
     audio = await OpenAITextToSpeech(api_key=EMERGENT_KEY).generate_speech(text=text[:4000], model="tts-1", voice=s.voice if s.voice in VOICES else "nova")
     return audio, "openai"
