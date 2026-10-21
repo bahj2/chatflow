@@ -983,6 +983,8 @@ async def notion_status(user=Depends(current_user)):
 
 @api.post("/notion/connect")
 async def notion_connect(body: NotionConnectIn, bg: BackgroundTasks, user=Depends(current_user)):
+    if not rate_ok([(f"nconn:{user['business_id']}", 10, 3600)]):
+        raise HTTPException(429, "Too many tries. Please wait a few minutes.")
     token = body.token.strip()
     if not re.fullmatch(r"(ntn_|secret_)[A-Za-z0-9_-]{10,}", token):
         raise HTTPException(400, "This doesn't look like a Notion secret. It starts with ntn_")

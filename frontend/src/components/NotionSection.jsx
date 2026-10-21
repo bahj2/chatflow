@@ -28,7 +28,7 @@ const Step = ({ n, title, children, testid }) => (
 const ShareHelp = () => (
   <p className="text-xs text-slate-400 leading-relaxed">
     In Notion, open the page with your shop info → click <b className="text-slate-200">•••</b> (top right) → <b className="text-slate-200">Connections</b> → add <b className="text-slate-200">ReplyFlow</b>.
-    Sharing one parent page also shares every page inside it.
+    Sharing one parent page also shares every page inside it. Only share pages customers may see — the AI can repeat anything in them.
   </p>
 );
 
@@ -98,7 +98,7 @@ const Connected = ({ n, setN }) => {
     <div className="space-y-4" data-testid="notion-connected">
       <div className="rounded-xl border border-white/10 bg-[#0F1522] p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-sm" data-testid="notion-workspace">Connected to {n.workspace || "your Notion workspace"}</p>
+          <p className="font-medium text-sm" data-testid="notion-workspace">{n.status === "invalid" ? "Notion disconnected from" : "Connected to"} {n.workspace || "your Notion workspace"}</p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1"><StatusPill n={n} /><span className="text-[11px] font-mono text-slate-500">secret ••••{n.hint}</span></div>
         </div>
         <div className="flex gap-2">

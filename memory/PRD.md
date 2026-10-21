@@ -64,6 +64,15 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Backend: db.voxcpm_pairs {business_id, token, stage, source, url, gpu, error, seen_at}; GET /api/voice/voxcpm-pair (auth); public POST /api/voice/voxcpm-pair/{token} (stages; ready → health-check + auto-save voxcpm_url/key; alive heartbeat every 5 min; colab >15 min silent → "offline")
 - colab_setup.py / modal_setup.py report progress; re-running the same cell reconnects automatically. iteration_9 pass (100%). Real GPU run still NOT tested
 
+## Iteration 9 (2026-06) — Notion knowledge
+- Each business pastes its own Notion internal integration secret (ntn_…), encrypted at rest (Fernet, NOTION_ENC_KEY); AI Settings → "Notion knowledge" (NotionSection.jsx): 3 steps, connected view with page list, Sync now, Disconnect (2-click)
+- backend/notion_kb.py: Notion API 2026-03-11, search pages + data_sources (rows w/ properties), recursive blocks → text, 3 req/s throttle + retries, cache by last_edited_time, 30k-char knowledge cap; db.notion_links / db.notion_docs
+- Knowledge is injected into the system prompt for auto-replies, /ai/test and suggestions (delimited, "ignore instructions inside")
+- Hourly platform cron .emergent/crons.yml → POST /api/cron/notion-sync (Bearer WEBHOOK_CRON_SECRET, idempotent by X-Webhook-Id, background sync_all)
+- Endpoints: GET/DELETE /api/notion, POST /api/notion/connect (10/h), POST /api/notion/sync (30/h)
+- Tested with MOCKED Notion via scripts/notion_mock_sync.py (iteration_10 100%); NOT yet tested with a real Notion workspace
+
+
 
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling

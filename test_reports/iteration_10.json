@@ -1,0 +1,28 @@
+{
+  "summary": "Tested the Notion knowledge feature end to end. Backend: 20/20 pytest pass. Covered GET/connect/sync/delete, validation, fake-token 401 against the real Notion API, 'invalid' status that keeps the previous pages, multi-tenant isolation, cron auth, cron duplicate check and non-JSON body, the mock seed script (4 pages, cached second sync uses 4 calls vs 11), and the AI using Notion facts in /ai/test (EN + Khmer), the website widget chat and suggest. After disconnect the AI no longer knows the Notion facts. Frontend: setup steps, link, password input, disabled button and error toasts. Connected view: workspace, status, hint, 4 pages with icons, chars and links. Sync now shows a spinner, then 'Secret no longer works' with the error and Reconnect form, and the pages are kept. Disconnect needs two clicks. The no-pages amber box shows. Save still works and doesn't affect the Notion link. No horizontal overflow at 390px. Voice vox-auto-connect still renders. Admin was re-seeded at the end (status ok, 4 pages). The loadtest business is disconnected.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/notion/connect", "issue": "No rate limit. Each call hits the real api.notion.com, so a logged-in user can use it to probe tokens or spam Notion. /notion/sync has 30/h but connect has nothing."},
+    {"endpoint": "/api/notion/* (role)", "issue": "Any team member (role member) can connect, replace or disconnect the business's Notion secret. This matches /settings, which also has no role check, but owner-only would be safer."}
+  ]},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [
+    {"screen": "Settings > Notion (invalid state)", "issues": ["The header still says 'Connected to Sunrise Coffee' next to the red 'Secret no longer works' pill. Minor wording mismatch."]}
+  ]},
+  "test_report_links": ["/app/backend/tests/test_iter10_notion.py", "/app/test_reports/pytest/pytest_iter10.xml"],
+  "action_items": [
+    "Optional: add a rate limit to POST /api/notion/connect, e.g. 10/h per business",
+    "Optional: consider owner-only for Notion connect/disconnect",
+    "Note: all Notion page content goes into the prompt. In testing the AI told a customer the wifi password from the Notion page. Businesses should be told to share only customer-facing pages, e.g. with an extra line in the step-2 help text."
+  ],
+  "critical_code_review_comments": [
+    "notion_view correctly excludes token_enc and knowledge. The secret is Fernet-encrypted and only the hint is exposed. Verified in tests.",
+    "sync_business returns early when the link is disconnected or replaced mid-sync. Safe, because a replaced link gets status queued and its own background task.",
+    "rate_ok is in-memory, so the limit is per process and resets on restart. Fine for a single worker.",
+    "Cron marks the admin demo link 'invalid' (mock secret vs real Notion) on every hourly run until it is re-seeded. Expected, but the demo state won't last past the next cron run."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter10_notion.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "admin@replyflow.com re-seeded via scripts/notion_mock_sync.py (connected, status ok, 4 pages). The loadtest+706ab4fd business was briefly given a synthetic 0-page link to test the no-pages box, then removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_iter10_notion.py re-seeds admin itself (it needs subprocess access to /app/scripts). The test_iter9 suite needs REACT_APP_BACKEND_URL exported. 3 of its tests depend on an expired Cloudflare mock tunnel (louisiana-cancel-...trycloudflare.com) and fail for that reason only."
+}
