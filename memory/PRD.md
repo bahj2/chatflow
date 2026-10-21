@@ -78,6 +78,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Removed from Settings screen: Colab/Modal wizard, seller voice sample, Microsoft voice picker, "use VoxCPM2 for" (backend pairing endpoints + VoxAutoConnect.jsx file kept, unused)
 - Verified: HF Khmer audio round-trip transcript exact; widget voice → voxcpm2-hf audio; simulated HF down → text-only reply
 
+## Iteration 11 (2026-06) — Seller voice clone via HF demo
+- User: "not see upload voice clone?" → Seller voice block back in Khmer voice card: Record (auto-stop 30 s) or Upload, 5–30 s rule, auto transcript (Gemini) editable, Remove, Test seller voice
+- media.hf_voxcpm uploads the sample to /gradio_api/upload and calls generate in "Ultimate cloning" mode (ref audio + transcript); no sample → default young woman voice; HF timeout 60 s (voice test 50 s) → text-only reply
+- /api/voice/test errors return 424 (Cloudflare replaced 502 bodies); PUT /settings can't change seller_voice_media_id (cross-tenant fix) and keeps transcript on stale saves; seller-voice transcribes before saving, rejects empty speech
+- Website widget voice is now async: POST /public/{bid}/voice → {accepted, ai_reply}; widget polls every 2 s up to 90 s
+- iteration_11 + iteration_12 pass (100%)
+
+
 
 
 

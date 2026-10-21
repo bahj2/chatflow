@@ -294,7 +294,10 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     if body.voxcpm_url and not await public_https(body.voxcpm_url):
         raise HTTPException(400, "VoxCPM2 server URL must be a public internet address")
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
-    body.seller_voice_media_id = (await get_settings(user["business_id"])).seller_voice_media_id  # only /settings/seller-voice may change it
+    cur = await get_settings(user["business_id"])
+    if body.seller_voice_media_id != cur.seller_voice_media_id:
+        body.seller_voice_text = cur.seller_voice_text  # stale tab: keep the transcript of the stored sample
+    body.seller_voice_media_id = cur.seller_voice_media_id  # only /settings/seller-voice may change it
     body.seller_voice_text = body.seller_voice_text[:500]
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
@@ -488,7 +491,7 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
             mp3 = await M.to_mp3(audio)
             vm = await M.save_media(db, bid, mp3, "audio/mpeg", "voice")
             atts.append({"type": "audio", "media_id": vm["id"]})
-            text = await M.transcribe(mp3) or text
+            text = (await M.transcribe(mp3) or "").strip() or text
         except Exception as e:
             logger.exception("voice in failed: %s", e)
         text = text or "(voice message)"

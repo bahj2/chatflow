@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 12 retest of the seller voice clone fixes. All 4 retest items PASS. (1) /api/voice/test failure now returns 424 with the friendly JSON message. Seen live: the UI 'Test seller voice' hit the 50 s HF timeout and the backend log shows 424 Failed Dependency. Cloudflare let it through and the UI showed the friendly VoxCPM2 busy text. The same result was confirmed in-process by forcing M.speak to fail (Khmer and English messages both correct). A mocked HTML 502 makes the Preview fall back to BUSY_KM for Khmer and to 'Voice preview failed' for English. (2) PUT /api/settings ignores seller_voice_media_id: cross-tenant injection does not persist, a stale save with '' keeps the sample, and seller_voice_text can be edited and is capped at 500. (3) seller-voice: transcription failure gives 424 with no orphan media doc, an empty transcript gives 400 'No speech found', text over 500 gives 422, and the 5–30 s rules are unchanged. (4) Widget voice: ai_reply is false when auto_reply is off (UI spinner stopped after 4.6 s, no AI message) and false when the conversation's ai_enabled is false. ai_reply true: the UI waited and showed the AI reply with audio after 6.6 s. Regression PASS: the seller block is visible on desktop and at 390 px (no overflow); the 17 s upload shows player, transcript, Remove and Test seller voice (clone engine 200 in 25 s via API); Remove goes back to the default voice; Test Khmer voice gives VoxCPM2 default (38 s); English Preview gives OpenAI; the Notion section renders.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/settings", "issue": "seller_voice_text is still taken from the client while seller_voice_media_id is preserved. A stale tab, or any concurrent Save made while an upload is in progress, wipes the new transcript and keeps the new sample, so VoxCPM2 clones with an empty prompt_text. Reproduced by running the pytest workers in parallel: upload, then a concurrent PUT, left seller_voice_text ''. Suggest: if the client's text is empty and a stored sample exists, keep the stored text, or only accept text when the client's media id matches the stored one."},
+      {"endpoint": "media.load_media / M.speak", "issue": "Still no business_id check when loading the seller sample (defense in depth). The PUT fix closes the main injection path."},
+      {"endpoint": "POST /api/public/{bid}/voice", "issue": "A voice message with no speech (fake-mic beep) is saved as a user message with empty text. The widget bubble shows the audio and a blank text line."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ChatWidget header", "issues": ["'Replies instantly' is shown even when auto_reply is off"]},
+      {"screen": "Settings > Seller voice player", "issues": ["The uploaded sample <audio> shows 0:00 / 0:00 until it is played (metadata not preloaded). Cosmetic."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter11_seller_voice.py", "/app/backend/tests/test_iter12_voice_424_local.py", "/app/test_reports/pytest/pytest_iter12.xml"],
+  "action_items": [
+    "Optional: preserve seller_voice_text in PUT /settings when the client sends an empty or stale value, matching the media_id preservation",
+    "Optional: scope load_media to business_id in speak()",
+    "Optional: show a placeholder like 'Voice message' for user voice messages with an empty transcript; hide 'Replies instantly' when auto_reply is off"
+  ],
+  "critical_code_review_comments": [
+    "write_settings preserves the media id but not the matching transcript (see minor issue)",
+    "public_voice computes ai_reply from a conversation read before the background task runs; correct for new and existing sessions",
+    "ChatWidget waitForReply still spins for the full 90 s if ai_reply is true but the AI reply fails in the background; acceptable",
+    "server.py is 1238 lines and should be split into routers"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter11_seller_voice.py", "/app/backend/tests/test_iter12_voice_424_local.py", "/app/backend/tests/autoreply_toggle.py", "/app/backend/tests/cleanup_iter12.py"],
+  "success_rate": {"backend": "100% (19/19: 15 public-URL + 4 in-process; one parallel-run failure was the stale-text race caused by test concurrency, and it passed when run serially)", "frontend": "100% of retest + regression flows"},
+  "observed_timings": {"upload+transcribe 17 s mp3": "2.8 s", "clone voice/test API": "25.4 s 200", "default voice/test API": "20.8 s 200", "UI Test seller voice": "50.6 s -> 424 -> friendly busy msg", "UI Test Khmer voice": "38.5 s 200"},
+  "seed_data_creation": "None kept. Cleanup done: DELETE seller-voice for admin and loadtest+706ab4fd (media ''); admin auto_reply=true verified. Deleted 10 web conversations and 19 messages: the TEST_ ones plus every web conversation created in the last 40 min, which included the main agent's dev chats (hf-test-*, hf-down-test, clone-*, aitest-*). Telegram was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run test_iter11_seller_voice.py with '-n 0' (serial): pytest.ini enables xdist, and the parallel auto_reply PUT races with the upload test. test_iter12_voice_424_local.py uses TestClient with M.speak/M.transcribe monkeypatched to force the 424/400 paths. Run cleanup_iter12.py after testing.",
+  "test_credentials": "admin@replyflow.com / admin123; loadtest+706ab4fd@example.com / loadtest123"
+}

@@ -84,7 +84,7 @@ const SellerVoice = ({ s, setS }) => {
         <input ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="seller-voice-input"
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f, f.name); }} />
         {s.seller_voice_media_id && <>
-          <audio controls src={`${mediaUrl(s.seller_voice_media_id)}?auth=${localStorage.getItem("rf_token")}`} className="h-9" data-testid="seller-voice-audio" />
+          <audio controls preload="metadata" src={`${mediaUrl(s.seller_voice_media_id)}?auth=${localStorage.getItem("rf_token")}`} className="h-9" data-testid="seller-voice-audio" />
           <button type="button" onClick={remove} data-testid="seller-voice-delete-btn" className={`${btn} border border-white/10 text-slate-400 hover:text-red-300`}><Trash2 className="h-3.5 w-3.5" /> Remove</button>
         </>}
       </div>

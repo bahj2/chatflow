@@ -63,6 +63,10 @@ class TestSellerVoiceValidation:
         assert r.status_code == 400
         assert "10 MB" in r.json()["detail"]
 
+    def test_text_too_long_422(self, admin):
+        r = up(admin, "/tmp/long.mp3", text="a" * 501)
+        assert r.status_code == 422
+
     def test_unauth(self):
         with open("/tmp/long.mp3", "rb") as f:
             r = requests.post(f"{API}/settings/seller-voice", files={"file": ("s.mp3", f, "audio/mpeg")}, timeout=60)
@@ -95,7 +99,7 @@ class TestSellerVoiceFlow:
         v = requests.post(f"{API}/voice/test", headers=H(admin), json={"text": KM}, timeout=70)
         TIMINGS["clone"] = time.time() - t0
         print("clone test:", v.status_code, round(TIMINGS["clone"], 1), v.text[:200])
-        assert v.status_code in (200, 502)
+        assert v.status_code in (200, 424), v.text[:300]
         assert v.headers["content-type"].startswith("application/json")
         if v.status_code == 200:
             assert v.json()["engine"] == "voxcpm2-hf-clone"
@@ -112,10 +116,24 @@ class TestSellerVoiceFlow:
         orig = sb.get("seller_voice_media_id", "")
         sb["seller_voice_media_id"] = a_mid
         r = requests.put(f"{API}/settings", headers=H(other), json=sb, timeout=30)
+        assert r.status_code == 200
+        assert r.json()["seller_voice_media_id"] == orig
         after = requests.get(f"{API}/settings", headers=H(other), timeout=30).json()["seller_voice_media_id"]
-        # restore
-        requests.delete(f"{API}/settings/seller-voice", headers=H(other), timeout=30)
-        assert after != a_mid, f"PUT /settings accepted another tenant's seller_voice_media_id (status {r.status_code})"
+        assert after == orig, f"PUT /settings accepted another tenant's seller_voice_media_id"
+
+    def test_stale_save_keeps_sample_and_text_editable(self, admin):
+        s = requests.get(f"{API}/settings", headers=H(admin), timeout=30).json()
+        mid = s["seller_voice_media_id"]
+        if not mid:
+            pytest.skip("no admin sample")
+        s["seller_voice_media_id"] = ""
+        s["seller_voice_text"] = "TEST edited transcript " + "x" * 600
+        r = requests.put(f"{API}/settings", headers=H(admin), json=s, timeout=30)
+        assert r.status_code == 200
+        g = requests.get(f"{API}/settings", headers=H(admin), timeout=30).json()
+        assert g["seller_voice_media_id"] == mid
+        assert g["seller_voice_text"].startswith("TEST edited transcript")
+        assert len(g["seller_voice_text"]) == 500
 
     def test_delete_then_default_engine(self, admin):
         r = requests.delete(f"{API}/settings/seller-voice", headers=H(admin), timeout=30)
@@ -126,7 +144,7 @@ class TestSellerVoiceFlow:
         v = requests.post(f"{API}/voice/test", headers=H(admin), json={"text": KM}, timeout=70)
         TIMINGS["default"] = time.time() - t0
         print("default test:", v.status_code, round(TIMINGS["default"], 1), v.text[:200])
-        assert v.status_code in (200, 502)
+        assert v.status_code in (200, 424), v.text[:300]
         assert v.headers["content-type"].startswith("application/json")
         if v.status_code == 200:
             assert v.json()["engine"] == "voxcpm2-hf"
@@ -147,7 +165,7 @@ class TestWidgetVoice:
             r = requests.post(f"{API}/public/default/voice", data={"session_id": sid, "name": "TEST voice"},
                               files={"file": ("v.mp3", f, "audio/mpeg")}, timeout=30)
         accept_t = time.time() - t0
-        assert r.status_code == 200 and r.json() == {"accepted": True}
+        assert r.status_code == 200 and r.json() == {"accepted": True, "ai_reply": True}
         assert accept_t < 10, f"accept took {accept_t}"
         user_seen = ai = None
         for _ in range(60):
@@ -167,3 +185,46 @@ class TestWidgetVoice:
         audio = [a for a in ai.get("attachments", []) if a["type"] == "audio"]
         if audio:
             assert audio[0]["engine"] in ("voxcpm2-hf", "voxcpm2-hf-clone", "openai")
+
+
+# --- widget ai_reply flag (iteration 12)
+def _voice(sid):
+    with open("/tmp/vox_km.mp3", "rb") as f:
+        return requests.post(f"{API}/public/default/voice", data={"session_id": sid, "name": "TEST voice"},
+                             files={"file": ("v.mp3", f, "audio/mpeg")}, timeout=30)
+
+
+class TestWidgetAiReplyFlag:
+    def test_auto_reply_off(self, admin):
+        s = requests.get(f"{API}/settings", headers=H(admin), timeout=30).json()
+        s["auto_reply"] = False
+        assert requests.put(f"{API}/settings", headers=H(admin), json=s, timeout=30).status_code == 200
+        try:
+            sid = f"TEST_web-off-{uuid.uuid4()}"
+            r = _voice(sid)
+            assert r.status_code == 200 and r.json() == {"accepted": True, "ai_reply": False}
+            for _ in range(30):
+                time.sleep(2)
+                msgs = requests.get(f"{API}/public/default/chat/{sid}", timeout=30).json()["messages"]
+                if msgs:
+                    break
+            assert msgs and msgs[0]["role"] == "user"
+            time.sleep(6)
+            msgs = requests.get(f"{API}/public/default/chat/{sid}", timeout=30).json()["messages"]
+            assert not [m for m in msgs if m["role"] == "ai"]
+        finally:
+            s["auto_reply"] = True
+            requests.put(f"{API}/settings", headers=H(admin), json=s, timeout=30)
+        assert requests.get(f"{API}/settings", headers=H(admin), timeout=30).json()["auto_reply"] is True
+
+    def test_conversation_ai_disabled(self, admin):
+        sid = f"TEST_web-conv-{uuid.uuid4()}"
+        r = requests.post(f"{API}/public/default/chat", json={"session_id": sid, "name": "TEST convoff", "text": "hello"}, timeout=90)
+        assert r.status_code == 200, r.text
+        items = requests.get(f"{API}/conversations", headers=H(admin), params={"q": "TEST convoff"}, timeout=30).json()["items"]
+        conv = [c for c in items if c.get("external_id") == sid]
+        assert conv, "conversation not found"
+        p = requests.patch(f"{API}/conversations/{conv[0]['id']}", headers=H(admin), json={"ai_enabled": False}, timeout=30)
+        assert p.status_code == 200 and p.json()["ai_enabled"] is False
+        r = _voice(sid)
+        assert r.status_code == 200 and r.json() == {"accepted": True, "ai_reply": False}
