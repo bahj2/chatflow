@@ -1,0 +1,8 @@
+crons:
+  - name: notion-sync
+    description: "Re-syncs every business's shared Notion pages into AI knowledge once an hour"
+    cron: "0 * * * *"
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    endpoint: "{{BASE_URL}}/api/cron/notion-sync"
+    method: POST
+    enabled: true

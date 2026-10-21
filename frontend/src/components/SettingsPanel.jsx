@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Attachments } from "@/components/Attachments";
 import { VoiceSection } from "@/components/VoiceSettings";
+import { NotionSection } from "@/components/NotionSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Section = ({ title, desc, children }) => (
@@ -110,6 +111,8 @@ export default function SettingsPanel() {
           <button onClick={() => setS({ ...s, faqs: [...s.faqs, { q: "", a: "" }] })} data-testid="add-faq-btn"
             className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
         </Section>
+
+        <NotionSection Section={Section} />
 
         <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own).">
           <div className="flex gap-2">
