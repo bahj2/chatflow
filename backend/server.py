@@ -10,7 +10,7 @@ import json
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 import bcrypt
 import httpx
@@ -92,11 +92,11 @@ class Settings(BaseModel):
     quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])
     allowed_emails: List[str] = []
     voice_replies: bool = True
-    voice: str = "nova"
-    khmer_voice: str = "sreymom"
+    voice: Literal["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"] = "nova"
+    khmer_voice: Literal["sreymom", "piseth"] = "sreymom"
     voxcpm_url: str = ""
     voxcpm_key: str = ""
-    voxcpm_for: str = "khmer"
+    voxcpm_for: Literal["khmer", "all"] = "khmer"
     seller_voice_media_id: str = ""
     seller_voice_text: str = ""
 
@@ -129,6 +129,12 @@ class TelegramConnectIn(BaseModel):
 
 class TestAIIn(BaseModel):
     text: str
+
+
+class VoiceTestIn(BaseModel):
+    text: str
+    voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]] = None
+    khmer_voice: Optional[Literal["sreymom", "piseth"]] = None
 
 
 # ---------- Auth ----------
@@ -358,7 +364,8 @@ async def transcript(conv_id: str, limit: int = 20) -> str:
 
 
 SPOKEN = (" This reply will be SPOKEN as a voice message: write natural spoken sentences only, no emoji, no symbols like $ % or /, "
-          "write prices and numbers as words in the customer's language (e.g. in Khmer 'បីដុល្លារកន្លះ'), and do not mix in English words when replying in another language.")
+          "write prices and numbers as words in the customer's language (e.g. in Khmer 'បីដុល្លារកន្លះ'), and never mix in English words when replying in another language "
+          "(translate or transliterate product terms, e.g. 'gluten' -> 'ស្អិត').")
 
 
 async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False) -> str:
@@ -817,8 +824,9 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=
 
 
 @api.post("/voice/test")
-async def voice_test(body: TestAIIn, user=Depends(current_user)):
+async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     s = await get_settings(user["business_id"])
+    s = s.model_copy(update={k: v for k, v in {"voice": body.voice, "khmer_voice": body.khmer_voice}.items() if v})
     try:
         audio, engine = await M.speak(db, s, body.text[:500])
     except Exception as e:

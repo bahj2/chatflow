@@ -14,12 +14,12 @@ const VOICES = [["nova", "Nova — energetic"], ["shimmer", "Shimmer — bright"
 
 const ENGINES = { voxcpm2: "VoxCPM2 (seller voice)", microsoft: "Microsoft native Khmer voice", "openai-hd": "OpenAI gpt-4o-mini-tts", openai: "OpenAI" };
 
-const Preview = ({ text, label, testid }) => {
+const Preview = ({ text, label, testid, s }) => {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
   const run = async () => {
     setBusy(true);
-    try { setRes((await api.post("/voice/test", { text })).data); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+    try { setRes((await api.post("/voice/test", { text, voice: s.voice, khmer_voice: s.khmer_voice })).data); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
   };
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -93,7 +93,7 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
         </Select>
       </Field>
     </div>
-    <Preview text="Hi! Thanks for your message. How can I help you today?" label="Preview voice (save first)" testid="voice-preview-btn" />
+    <Preview s={s} text="Hi! Thanks for your message. How can I help you today?" label="Preview voice" testid="voice-preview-btn" />
 
     <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 space-y-4" data-testid="khmer-voice-card">
       <div>
@@ -109,7 +109,7 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
           </SelectContent>
         </Select>
       </Field>
-      <Preview text="សួស្តីបង! អរគុណសម្រាប់សាររបស់បង។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice (save first)" testid="khmer-preview-btn" />
+      <Preview text="សួស្តីបង! អរគុណសម្រាប់សាររបស់បង។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice" testid="khmer-preview-btn" s={s} />
       <div className="border-t border-white/10 pt-4">
         <p className="font-medium text-sm">Optional: seller’s own voice — VoxCPM2</p>
         <p className="text-xs text-slate-400 mt-1">VoxCPM2 runs on your own GPU server (e.g. <code className="font-mono">vllm serve openbmb/VoxCPM2 --omni</code>). When set, it is used first; if it fails, the native Khmer voice above is used.</p>

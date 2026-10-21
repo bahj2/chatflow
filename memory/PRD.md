@@ -46,6 +46,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Media served via /api/media/{id} (seller voice requires ?auth token)
 - Tested: iteration_6 pass (19/20, delete-404 fixed after)
 
+## Iteration 6 (2026-06) — Khmer voice clarity fix
+- Root cause: whisper-1 romanized Khmer speech (AI couldn't understand); tts-1 Khmer ~21% intelligible
+- STT → Gemini 3 Flash audio transcription (native script) with Whisper fallback; old Sambath transcripts corrected
+- Khmer TTS → Microsoft native neural voices via edge-tts (Sreymom female 97.7% / Piseth male 92.4% round-trip clarity), fallback gpt-4o-mini-tts (92%, slow); VoxCPM2 still first if configured
+- Spoken replies: no emoji/symbols, numbers as words, no English words; Noto Sans Khmer font fallback; preview uses unsaved selection; Literal validation for voice fields
+- Tested: iteration_7 8/8 pass
+- Note: edge-tts is Microsoft Edge's free read-aloud service (unofficial); official Azure Speech key = same voices, more reliable for production
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

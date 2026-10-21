@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the Khmer voice fix end to end on the Sunrise Coffee loadtest business. Backend: 8/8 pytest passed. Khmer speech (edge-tts Piseth saying 'សួស្តីបង បងមានលក់អីដែរ?') posted to /public/{bid}/voice came back as an exact Khmer-script transcript. The AI replied in Khmer with prices written as words, no emoji, no '$' and no Latin letters. The reply audio used engine 'microsoft', and GET /api/media returned audio/mpeg. Transcribing the reply audio back with Gemini matched the reply text at 0.89 (the only differences were words written back as digits). English voice: English transcript, engine 'openai'. Typed Khmer: Khmer text reply with no audio. /voice/test: Khmer gives microsoft, khmer_voice=piseth gives microsoft with different audio, English gives openai, emoji text gives microsoft, a bogus VoxCPM2 URL falls back to microsoft, and an unknown khmer_voice value falls back to sreymom. UI: khmer-voice-card, the Sreymom/Piseth select (persists after save and reload), khmer-preview-btn (audio plays, 5.9 s; engine 'Microsoft native Khmer voice'), voice-preview-btn (engine 'OpenAI') and the VoxCPM2 fields all checked. Regression: inbox shows both audio players with valid durations, the Khmer transcript shows as the user message, and the widget chat-mic-btn is present. Telegram and admin business not touched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/{bid}/voice (spoken reply)", "issue": "The SPOKEN prompt is usually followed, but 1 of 3 Khmer voice replies still had an English word ('gluten'), which the Khmer TTS then reads out. Possible fix: post-process or translate leftover Latin words before TTS."},
+      {"endpoint": "/api/settings PUT", "issue": "khmer_voice and voxcpm_for are free strings with no Literal validation, so 'bogus' is accepted and saved. TTS falls back silently, so nothing breaks."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inbox / chat bubbles", "issues": ["The app fonts (Manrope) have no Khmer glyphs and no Khmer webfont fallback is set. In the headless Chromium screenshot Khmer text rendered with broken shaping. Add 'Noto Sans Khmer' as a font fallback for consistent rendering."]},
+      {"screen": "AI Settings > Voice", "issues": ["The preview buttons use the SAVED settings, not the unsaved selection. The label says '(save first)', but users may still be confused. Also, both preview audios autoplay and can overlap."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter7_khmer_voice.py", "/app/backend/tests/gen_khmer_fixtures.py", "/app/test_reports/pytest/pytest_iter7.xml"],
+  "action_items": [
+    "Optional: add a Noto Sans Khmer font fallback in index.css",
+    "Optional: validate khmer_voice and voxcpm_for with Literal types",
+    "Optional: strip or translate leftover English words in spoken Khmer replies"
+  ],
+  "critical_code_review_comments": [
+    "media.speak: the gpt-4o-mini-tts fallback is only used when edge-tts raises an error. edge-tts depends on an unofficial Microsoft endpoint, so watch for outages or rate limits in production.",
+    "media.gemini_transcribe always sends mime audio/mpeg, which is fine because the input is converted to mp3 first. If Gemini returns an empty string for real speech, the Whisper fallback is not used (it only runs on exceptions). Consider falling back to Whisper on empty output too.",
+    "voice_test media docs (kind voice_test) are never cleaned up, so storage grows with every preview click."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter7_khmer_voice.py", "/app/backend/tests/gen_khmer_fixtures.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100%"},
+  "seed_data_creation": "Fixtures in /tmp/rf_fixtures/khmer_q.mp3 and english_q.mp3 (regenerate with python tests/gen_khmer_fixtures.py). TEST_iter7_* conversations were deleted. Sunrise settings were restored (sreymom, nova, voice_replies true, voxcpm_url empty).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: python tests/gen_khmer_fixtures.py, then pytest tests/test_iter7_khmer_voice.py -n 0 -s (prints transcripts and replies). The module fixture restores Sunrise settings and deletes TEST_iter7 conversations. Do not touch the admin business or its Telegram setup."
+}
