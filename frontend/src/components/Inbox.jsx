@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, ArrowUp, Bot, User, Headphones, ArrowLeft, Loader2, Zap } from "lucide-react";
 import { SummaryPanel, SummaryStrip } from "@/components/CustomerSummary";
+import { Attachments, AudioAtt } from "@/components/Attachments";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/auth";
 import { ChannelBadge } from "@/components/ChannelBadge";
@@ -73,7 +74,11 @@ const Bubble = ({ m }) => {
         <p className={`text-[10px] font-mono uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1 ${mine ? "justify-end" : ""}`}>
           <r.Icon className="h-3 w-3" />{r.label} · {time(m.created_at)}
         </p>
-        <div className={`border rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${r.cls}`}>{m.text}</div>
+        <div className={`border rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap space-y-1.5 ${r.cls}`}>
+          {(m.attachments || []).filter((a) => a.type === "audio").map((a, i) => <AudioAtt key={i} a={a} testid={`message-${m.role}-audio`} />)}
+          <p className={(m.attachments || []).some((a) => a.type === "audio") ? "text-xs text-slate-300" : ""}>{m.text}</p>
+        </div>
+        <div className={`mt-2 flex ${mine ? "justify-end" : ""}`}><Attachments atts={(m.attachments || []).filter((a) => a.type === "product")} prefix={`message-${m.role}`} /></div>
       </div>
     </div>
   );

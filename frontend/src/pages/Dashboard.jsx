@@ -1,13 +1,15 @@
 import { NavLink, Routes, Route, Link, Navigate } from "react-router-dom";
-import { Inbox as InboxIcon, Settings2, Plug, LogOut, Zap, ExternalLink, Building2 } from "lucide-react";
+import { Inbox as InboxIcon, Settings2, Plug, LogOut, Zap, ExternalLink, Building2, Package } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Inbox from "@/components/Inbox";
 import SettingsPanel from "@/components/SettingsPanel";
 import ChannelsPanel from "@/components/ChannelsPanel";
 import AdminPanel from "@/components/AdminPanel";
+import ProductsPanel from "@/components/ProductsPanel";
 
 const NAV = [
   { to: "/dashboard", label: "Inbox", Icon: InboxIcon, end: true, id: "inbox" },
+  { to: "/dashboard/products", label: "Products", Icon: Package, id: "products" },
   { to: "/dashboard/settings", label: "AI Settings", Icon: Settings2, id: "settings" },
   { to: "/dashboard/channels", label: "Channels", Icon: Plug, id: "channels" },
 ];
@@ -47,6 +49,7 @@ export default function Dashboard() {
           <Route index element={<Inbox />} />
           <Route path="settings" element={<SettingsPanel />} />
           <Route path="channels" element={<ChannelsPanel />} />
+          <Route path="products" element={<ProductsPanel />} />
           {user.role === "superadmin" && <Route path="businesses" element={<AdminPanel />} />}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

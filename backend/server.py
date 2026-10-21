@@ -15,7 +15,7 @@ from typing import List, Optional
 import bcrypt
 import httpx
 import jwt
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, BackgroundTasks, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, BackgroundTasks, Query, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -28,6 +28,7 @@ import hmac
 import time
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+import media as M
 
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
@@ -90,6 +91,20 @@ class Settings(BaseModel):
     fb_app_secret: str = ""
     quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])
     allowed_emails: List[str] = []
+    voice_replies: bool = True
+    voice: str = "nova"
+    voxcpm_url: str = ""
+    voxcpm_key: str = ""
+    voxcpm_for: str = "khmer"
+    seller_voice_media_id: str = ""
+    seller_voice_text: str = ""
+
+
+class ProductIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    price: str = Field(default="", max_length=40)
+    description: str = Field(default="", max_length=1000)
+    image_media_id: str = ""
 
 
 class PublicChatIn(BaseModel):
@@ -279,7 +294,33 @@ TONES = {
 }
 
 
-def system_prompt(s: Settings) -> str:
+SHOW_TAG = re.compile(r"\[\[show:([^\]]*)\]\]", re.I)
+
+
+def catalog_text(products: list) -> str:
+    if not products:
+        return ""
+    rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'} | {(p.get('description') or '')[:160]}" for p in products)
+    return ("\n\nPRODUCT CATALOG (ref | name | price | description):\n" + rows +
+            "\n\nWhen the customer asks about products, prices or availability, or seeing a product would clearly help, "
+            "mention the product name and price in your reply and END your reply with a tag like [[show:ref1,ref2]] "
+            "listing up to 3 refs from the catalog that best match (only refs that exist). The product photos are sent automatically "
+            "with your reply, so never ask whether they want to see a photo. Otherwise add no tag.")
+
+
+def split_show(text: str, products: list) -> tuple:
+    refs = [r.strip().lower() for m in SHOW_TAG.findall(text) for r in m.split(",") if r.strip()]
+    clean = SHOW_TAG.sub("", text).strip()
+    picked = [p for r in refs for p in products if p["id"].startswith(r)]
+    seen = set()
+    return clean, [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:3]
+
+
+async def load_products(bid: str) -> list:
+    return await db.products.find({"business_id": bid, "is_deleted": False}, {"_id": 0}).sort("created_at", -1).to_list(300)
+
+
+def system_prompt(s: Settings, products: Optional[list] = None) -> str:
     faqs = "\n".join(f"Q: {f.q}\nA: {f.a}" for f in s.faqs) or "(none)"
     lang = "Always reply in the same language the customer writes in." if s.language == "auto" else f"Always reply in {s.language}."
     return (
@@ -289,6 +330,7 @@ def system_prompt(s: Settings) -> str:
         f"Understand what the customer really wants, answer it directly, and suggest a next step when helpful. {lang} "
         "Only use the business information and FAQs for facts like prices, hours or policies; if you don't know, say a team member will follow up. "
         "Never mention you are an AI model name. Plain text only, no markdown."
+        + catalog_text(products or [])
     )
 
 
@@ -310,12 +352,12 @@ async def transcript(conv_id: str, limit: int = 20) -> str:
     return "\n".join(f"{label[m['role']]}: {m['text']}" for m in reversed(msgs))
 
 
-async def generate_reply(conv_id: str, s: Settings) -> str:
+async def generate_reply(conv_id: str, s: Settings, products: list) -> str:
     t = await transcript(conv_id)
     prompt = f"Conversation so far:\n{t}\n\nWrite the assistant's next reply to the customer. Output only the reply text."
     for attempt in range(3):
         try:
-            return await llm(s, system_prompt(s), prompt)
+            return await llm(s, system_prompt(s, products), prompt)
         except Exception as e:
             if attempt == 2:
                 raise
@@ -338,11 +380,13 @@ async def get_or_create_conv(bid: str, channel: str, external_id: str, name: str
     return conv
 
 
-async def add_message(conv: dict, role: str, text: str) -> dict:
+async def add_message(conv: dict, role: str, text: str, attachments: Optional[list] = None) -> dict:
     conv_id = conv["id"]
-    msg = {"id": str(uuid.uuid4()), "conversation_id": conv_id, "business_id": conv["business_id"], "role": role, "text": text, "created_at": now_iso()}
+    msg = {"id": str(uuid.uuid4()), "conversation_id": conv_id, "business_id": conv["business_id"], "role": role, "text": text,
+           "attachments": attachments or [], "created_at": now_iso()}
     await db.messages.insert_one(dict(msg))
-    upd = {"$set": {"last_message": text[:140], "updated_at": msg["created_at"], "last_role": role}}
+    voice = any(a["type"] == "audio" for a in msg["attachments"])
+    upd = {"$set": {"last_message": (("[Voice] " if voice else "") + text)[:140], "updated_at": msg["created_at"], "last_role": role}}
     if role == "user":
         upd["$inc"] = {"unread": 1}
     await db.conversations.update_one({"id": conv_id}, upd)
@@ -360,19 +404,84 @@ async def send_to_channel(conv: dict, text: str, s: Settings):
             logger.info("messenger send %s %s", r.status_code, r.text[:200])
 
 
-async def handle_incoming(bid: str, channel: str, external_id: str, name: str, text: str):
+async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes], products: list):
+    ch, to = conv["channel"], conv["external_id"]
+    if ch == "web" or not ((ch == "telegram" and s.telegram_token) or (ch == "messenger" and s.fb_page_token)):
+        return
+    if voice_mp3 is None:
+        await send_to_channel(conv, text, s)
+    async with httpx.AsyncClient(timeout=60) as h:
+        try:
+            if ch == "telegram":
+                base = f"https://api.telegram.org/bot{s.telegram_token}"
+                if voice_mp3 is not None:
+                    r = await h.post(f"{base}/sendVoice", data={"chat_id": to}, files={"voice": ("reply.mp3", voice_mp3, "audio/mpeg")})
+                    logger.info("telegram voice %s %s", r.status_code, r.text[:150])
+                for p in products:
+                    cap = f"{p['name']}" + (f" — {p['price']}" if p.get("price") else "")
+                    img, doc = await M.load_media(db, p["image_media_id"]) if p.get("image_media_id") else (None, None)
+                    if img:
+                        r = await h.post(f"{base}/sendPhoto", data={"chat_id": to, "caption": cap}, files={"photo": ("product.jpg", img, doc["content_type"])})
+                    else:
+                        r = await h.post(f"{base}/sendMessage", json={"chat_id": to, "text": cap})
+                    logger.info("telegram product %s %s", r.status_code, r.text[:150])
+            else:
+                url, params = "https://graph.facebook.com/v21.0/me/messages", {"access_token": s.fb_page_token}
+                rcpt = json.dumps({"id": to})
+
+                async def attach(kind, data, fname, ct):
+                    msg = json.dumps({"attachment": {"type": kind, "payload": {"is_reusable": False}}})
+                    r = await h.post(url, params=params, data={"recipient": rcpt, "message": msg, "messaging_type": "RESPONSE"}, files={"filedata": (fname, data, ct)})
+                    logger.info("messenger %s %s %s", kind, r.status_code, r.text[:150])
+                if voice_mp3 is not None:
+                    await attach("audio", voice_mp3, "reply.mp3", "audio/mpeg")
+                for p in products:
+                    img, doc = await M.load_media(db, p["image_media_id"]) if p.get("image_media_id") else (None, None)
+                    if img:
+                        await attach("image", img, "product.jpg", doc["content_type"])
+                    await send_to_channel(conv, f"{p['name']}" + (f" — {p['price']}" if p.get("price") else ""), s)
+        except Exception as e:
+            logger.exception("deliver failed: %s", e)
+
+
+def product_att(p: dict) -> dict:
+    return {"type": "product", "product_id": p["id"], "media_id": p.get("image_media_id") or None, "name": p["name"], "price": p.get("price", "")}
+
+
+async def handle_incoming(bid: str, channel: str, external_id: str, name: str, text: str, audio: Optional[bytes] = None):
     conv = await get_or_create_conv(bid, channel, external_id, name)
-    await add_message(conv, "user", text)
+    atts = []
+    if audio:
+        try:
+            mp3 = await M.to_mp3(audio)
+            vm = await M.save_media(db, bid, mp3, "audio/mpeg", "voice")
+            atts.append({"type": "audio", "media_id": vm["id"]})
+            text = await M.transcribe(mp3) or text
+        except Exception as e:
+            logger.exception("voice in failed: %s", e)
+        text = text or "(voice message)"
+    await add_message(conv, "user", text, atts)
     s = await get_settings(bid)
     if not (s.auto_reply and conv["ai_enabled"]):
         return None
+    products = await load_products(bid)
     try:
-        reply = await generate_reply(conv["id"], s)
+        reply, shown = split_show(await generate_reply(conv["id"], s, products), products)
     except Exception as e:
         logger.exception("AI reply failed: %s", e)
         return None
-    msg = await add_message(conv, "ai", reply)
-    await send_to_channel(conv, reply, s)
+    ratts, voice_mp3 = [], None
+    if audio and s.voice_replies:
+        try:
+            voice_mp3, engine = await M.speak(db, s, reply)
+            vm = await M.save_media(db, bid, voice_mp3, "audio/mpeg", "voice")
+            ratts.append({"type": "audio", "media_id": vm["id"], "engine": engine})
+        except Exception as e:
+            logger.exception("voice reply failed: %s", e)
+            voice_mp3 = None
+    ratts += [product_att(p) for p in shown]
+    msg = await add_message(conv, "ai", reply, ratts)
+    await deliver(conv, s, reply, voice_mp3, shown)
     return msg
 
 
@@ -440,6 +549,19 @@ async def public_chat(bid: str, body: PublicChatIn, request: Request):
     return {"reply": msg}
 
 
+@api.post("/public/{bid}/voice")
+async def public_voice(bid: str, request: Request, session_id: str = Form(..., max_length=100), name: str = Form("Website visitor"),
+                       file: UploadFile = File(...)):
+    bid = await resolve_bid(bid)
+    ip = client_ip(request)
+    if not rate_ok([(f"s:{bid}:{session_id}", 6, 60), (f"ip:{ip}", 20, 60), (f"iph:{ip}", 150, 3600)]):
+        raise HTTPException(429, "You're sending messages too fast. Please wait a moment and try again.")
+    data = await file.read()
+    if not data or len(data) > 10 * 1024 * 1024:
+        raise HTTPException(400, "Voice message must be under 10 MB")
+    return {"reply": await handle_incoming(bid, "web", session_id, name[:80], "", audio=data)}
+
+
 @api.get("/public/{bid}/chat/{session_id}")
 async def public_history(bid: str, session_id: str):
     bid = await resolve_bid(bid)
@@ -462,11 +584,25 @@ async def telegram_webhook(bid: str, request: Request, bg: BackgroundTasks):
         raise HTTPException(403, "Bad secret")
     data = await request.json()
     m = data.get("message") or {}
+    frm = m.get("from", {})
+    name = " ".join(filter(None, [frm.get("first_name"), frm.get("last_name")])) or frm.get("username") or "Telegram user"
+    voice = m.get("voice") or m.get("audio")
     if m.get("text"):
-        frm = m.get("from", {})
-        name = " ".join(filter(None, [frm.get("first_name"), frm.get("last_name")])) or frm.get("username") or "Telegram user"
         bg.add_task(handle_incoming, bid, "telegram", str(m["chat"]["id"]), name, m["text"])
+    elif voice:
+        bg.add_task(telegram_voice, bid, s.telegram_token, str(m["chat"]["id"]), name, voice["file_id"], m.get("caption") or "")
     return {"ok": True}
+
+
+async def telegram_voice(bid, token, chat_id, name, file_id, caption):
+    try:
+        async with httpx.AsyncClient(timeout=60) as h:
+            fp = (await h.get(f"https://api.telegram.org/bot{token}/getFile", params={"file_id": file_id})).json()["result"]["file_path"]
+            audio = (await h.get(f"https://api.telegram.org/file/bot{token}/{fp}")).content
+    except Exception as e:
+        logger.exception("telegram voice download failed: %s", e)
+        return
+    await handle_incoming(bid, "telegram", chat_id, name, caption, audio=audio)
 
 
 @api.get("/webhooks/messenger/{bid}")
@@ -491,11 +627,26 @@ async def messenger_webhook(bid: str, request: Request, bg: BackgroundTasks):
         raise HTTPException(400, "Invalid JSON")
     for entry in data.get("entry", []):
         for ev in entry.get("messaging", []):
-            text = (ev.get("message") or {}).get("text")
-            if text and not ev["message"].get("is_echo"):
-                psid = ev["sender"]["id"]
-                bg.add_task(handle_incoming, bid, "messenger", psid, f"Messenger user {psid[-4:]}", text)
+            msg = ev.get("message") or {}
+            if not msg or msg.get("is_echo"):
+                continue
+            psid = ev["sender"]["id"]
+            audio = next((a for a in msg.get("attachments", []) if a.get("type") == "audio"), None)
+            if msg.get("text"):
+                bg.add_task(handle_incoming, bid, "messenger", psid, f"Messenger user {psid[-4:]}", msg["text"])
+            elif audio and audio.get("payload", {}).get("url"):
+                bg.add_task(messenger_voice, bid, psid, audio["payload"]["url"])
     return {"ok": True}
+
+
+async def messenger_voice(bid, psid, url):
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as h:
+            audio = (await h.get(url)).content
+    except Exception as e:
+        logger.exception("messenger voice download failed: %s", e)
+        return
+    await handle_incoming(bid, "messenger", psid, f"Messenger user {psid[-4:]}", "", audio=audio)
 
 
 # ---------- Admin inbox ----------
@@ -557,7 +708,7 @@ async def suggest(cid: str, user=Depends(current_user)):
     await load_conv(cid, user["business_id"])
     s = await get_settings(user["business_id"])
     t = await transcript(cid)
-    raw = await llm(s, system_prompt(s), f"Conversation so far:\n{t}\n\nGive 3 different short ready-to-send replies to the customer's latest message "
+    raw = await llm(s, system_prompt(s, await load_products(user["business_id"])), f"Conversation so far:\n{t}\n\nGive 3 different short ready-to-send replies to the customer's latest message "
                     "(e.g. one direct answer, one asking a clarifying question, one with a next step/offer). "
                     'Respond ONLY with a JSON array of 3 strings.')
     m = re.search(r"\[.*\]", raw, re.S)
@@ -565,14 +716,95 @@ async def suggest(cid: str, user=Depends(current_user)):
         items = json.loads(m.group(0)) if m else []
     except json.JSONDecodeError:
         items = []
-    items = [str(i) for i in items if str(i).strip()][:3] or [raw]
+    items = [SHOW_TAG.sub("", str(i)).strip() for i in items if str(i).strip()][:3] or [SHOW_TAG.sub("", raw).strip()]
     return {"suggestions": items}
 
 
 @api.post("/ai/test")
 async def ai_test(body: TestAIIn, user=Depends(current_user)):
     s = await get_settings(user["business_id"])
-    return {"reply": await llm(s, system_prompt(s), f"Customer: {body.text}\n\nWrite the assistant's reply. Output only the reply text.")}
+    products = await load_products(user["business_id"])
+    raw = await llm(s, system_prompt(s, products), f"Customer: {body.text}\n\nWrite the assistant's reply. Output only the reply text.")
+    reply, shown = split_show(raw, products)
+    return {"reply": reply, "products": [product_att(p) for p in shown]}
+
+
+# ---------- Media, products, voice ----------
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@api.get("/media/{mid}")
+async def get_media(mid: str):
+    data, doc = await M.load_media(db, mid)
+    if not data:
+        raise HTTPException(404, "Not found")
+    return Response(data, media_type=doc["content_type"], headers={"Cache-Control": "public, max-age=86400"})
+
+
+@api.post("/media/image")
+async def upload_image(file: UploadFile = File(...), user=Depends(current_user)):
+    if file.content_type not in IMAGE_TYPES:
+        raise HTTPException(400, "Please upload a JPG, PNG or WEBP image")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Image must be under 5 MB")
+    doc = await M.save_media(db, user["business_id"], data, file.content_type, "product")
+    return {"id": doc["id"]}
+
+
+@api.get("/products")
+async def list_products(user=Depends(current_user)):
+    return await load_products(user["business_id"])
+
+
+@api.post("/products")
+async def create_product(body: ProductIn, user=Depends(current_user)):
+    bid = user["business_id"]
+    if await db.products.count_documents({"business_id": bid, "is_deleted": False}) >= 300:
+        raise HTTPException(400, "Product limit reached (300)")
+    doc = {"id": str(uuid.uuid4()), "business_id": bid, **body.model_dump(), "is_deleted": False, "created_at": now_iso()}
+    await db.products.insert_one(dict(doc))
+    return doc
+
+
+@api.put("/products/{pid}")
+async def update_product(pid: str, body: ProductIn, user=Depends(current_user)):
+    flt = {"id": pid, "business_id": user["business_id"], "is_deleted": False}
+    if not (await db.products.update_one(flt, {"$set": body.model_dump()})).matched_count:
+        raise HTTPException(404, "Product not found")
+    return await db.products.find_one(flt, {"_id": 0})
+
+
+@api.delete("/products/{pid}")
+async def delete_product(pid: str, user=Depends(current_user)):
+    await db.products.update_one({"id": pid, "business_id": user["business_id"]}, {"$set": {"is_deleted": True}})
+    return {"ok": True}
+
+
+@api.post("/settings/seller-voice")
+async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=Depends(current_user)):
+    data = await file.read()
+    if not data or len(data) > 10 * 1024 * 1024:
+        raise HTTPException(400, "Voice sample must be under 10 MB")
+    try:
+        wav = await M.to_wav16k(data)
+    except Exception:
+        raise HTTPException(400, "Could not read this audio file")
+    doc = await M.save_media(db, user["business_id"], wav, "audio/wav", "seller_voice")
+    text = text.strip() or await M.transcribe(await M.to_mp3(data))
+    await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"seller_voice_media_id": doc["id"], "seller_voice_text": text}})
+    return {"media_id": doc["id"], "text": text}
+
+
+@api.post("/voice/test")
+async def voice_test(body: TestAIIn, user=Depends(current_user)):
+    s = await get_settings(user["business_id"])
+    try:
+        audio, engine = await M.speak(db, s, body.text[:500])
+    except Exception as e:
+        raise HTTPException(502, f"Voice generation failed: {e}")
+    doc = await M.save_media(db, user["business_id"], audio, "audio/mpeg", "voice_test")
+    return {"media_id": doc["id"], "engine": engine}
 
 
 @api.get("/stats")
@@ -631,7 +863,7 @@ WIDGET_JS = r"""(function(){
   function init(){
     var f = document.createElement('iframe');
     f.src = origin + '/embed?b=' + encodeURIComponent(biz) + '&site=' + encodeURIComponent(location.hostname);
-    f.title = 'Chat'; f.allow = 'clipboard-write';
+    f.title = 'Chat'; f.allow = 'clipboard-write; microphone; autoplay';
     f.style.cssText = 'position:fixed;bottom:92px;' + side + ':20px;width:370px;max-width:calc(100vw - 40px);height:540px;max-height:calc(100vh - 120px);border:0;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);z-index:2147483646;display:none;background:#0F1522';
     var b = document.createElement('button');
     b.setAttribute('aria-label', 'Open chat'); b.id = 'replyflow-bubble';
@@ -708,6 +940,12 @@ async def startup():
     await db.businesses.create_index("id", unique=True)
     await db.settings.create_index("business_id", unique=True, partialFilterExpression={"business_id": {"$exists": True}})
     await db.users.create_index("id", unique=True)
+    await db.products.create_index([("business_id", 1), ("is_deleted", 1), ("created_at", -1)])
+    await db.media.create_index("id", unique=True)
+    try:
+        M.init_storage()
+    except Exception as e:
+        logger.error("Storage init failed: %s", e)
     email, pw = os.environ['ADMIN_EMAIL'].lower(), os.environ['ADMIN_PASSWORD']
     existing = await db.users.find_one({"email": email})
     if not existing:

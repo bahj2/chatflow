@@ -5,6 +5,8 @@ import { api, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Attachments } from "@/components/Attachments";
+import { VoiceSection } from "@/components/VoiceSettings";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Section = ({ title, desc, children }) => (
@@ -27,12 +29,12 @@ const Pick = ({ value, onChange, items, testid }) => (
 
 const Tester = () => {
   const [q, setQ] = useState("");
-  const [a, setA] = useState("");
+  const [a, setA] = useState(null);
   const [busy, setBusy] = useState(false);
   const run = async () => {
     if (!q.trim()) return;
     setBusy(true);
-    try { setA((await api.post("/ai/test", { text: q })).data.reply); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
+    try { setA((await api.post("/ai/test", { text: q })).data); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(false); }
   };
   return (
     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 space-y-3">
@@ -42,7 +44,8 @@ const Tester = () => {
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Test
         </button>
       </div>
-      {a && <p className="text-sm text-slate-200 whitespace-pre-wrap" data-testid="ai-test-reply">{a}</p>}
+      {a && <p className="text-sm text-slate-200 whitespace-pre-wrap" data-testid="ai-test-reply">{a.reply}</p>}
+      {a?.products?.length > 0 && <Attachments atts={a.products} prefix="ai-test" />}
     </div>
   );
 };
@@ -138,6 +141,8 @@ export default function SettingsPanel() {
           <button onClick={() => setS({ ...s, quick_replies: [...s.quick_replies, { label: "", text: "" }] })} data-testid="add-quick-btn"
             className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
         </Section>
+
+        <VoiceSection s={s} setS={setS} Section={Section} Field={Field} />
 
         <Section title="AI behaviour" desc="Model, tone and language for every reply.">
           <div className="grid sm:grid-cols-3 gap-4">
