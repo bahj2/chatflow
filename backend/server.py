@@ -183,7 +183,7 @@ async def register(body: RegisterIn, request: Request):
     email = body.email.strip().lower()
     if not re.fullmatch(EMAIL_RE, email):
         raise HTTPException(400, "Please enter a valid email")
-    if not rate_ok([(f"reg:{client_ip(request)}", 5, 3600)]):
+    if not rate_ok([(f"reg:{client_ip(request)}", 10, 3600)]):
         raise HTTPException(429, "Too many sign-ups from this network. Try again later.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "An account with this email already exists. Please sign in.")
@@ -500,7 +500,7 @@ async def messenger_webhook(bid: str, request: Request, bg: BackgroundTasks):
 
 # ---------- Admin inbox ----------
 @api.get("/conversations")
-async def list_convs(channel: Optional[str] = None, q: Optional[str] = None, before: Optional[str] = None,
+async def list_convs(channel: Optional[str] = None, q: Optional[str] = None, before: Optional[str] = None, before_id: Optional[str] = None,
                      limit: int = Query(50, ge=1, le=100), user=Depends(current_user)):
     bid = user["business_id"]
     flt = {"business_id": bid}
@@ -512,8 +512,9 @@ async def list_convs(channel: Optional[str] = None, q: Optional[str] = None, bef
         flt["$or"] = [{"id": {"$in": hits}}, {"name": rx}, {"last_message": rx}]
     total = await db.conversations.count_documents(flt)
     if before:
-        flt["updated_at"] = {"$lt": before}
-    items = await db.conversations.find(flt, {"_id": 0}).sort("updated_at", -1).to_list(limit + 1)
+        page = [{"updated_at": {"$lt": before}}, {"updated_at": before, "id": {"$lt": before_id or ""}}]
+        flt = {"$and": [flt, {"$or": page}]}
+    items = await db.conversations.find(flt, {"_id": 0}).sort([("updated_at", -1), ("id", -1)]).to_list(limit + 1)
     return {"items": items[:limit], "has_more": len(items) > limit, "total": total}
 
 
@@ -613,7 +614,8 @@ async def channels_status(user=Depends(current_user)):
             async with httpx.AsyncClient(timeout=10) as h:
                 info = (await h.get(f"https://api.telegram.org/bot{s.telegram_token}/getWebhookInfo")).json()
                 me_r = (await h.get(f"https://api.telegram.org/bot{s.telegram_token}/getMe")).json()
-            tg["connected"] = bool(info.get("result", {}).get("url"))
+            tg["connected"] = info.get("result", {}).get("url", "").endswith(f"/api/webhooks/telegram/{user['business_id']}")
+            tg["last_error"] = info.get("result", {}).get("last_error_message")
             tg["bot"] = me_r.get("result", {}).get("username")
         except Exception:
             pass
@@ -670,8 +672,9 @@ async def conv_summary(cid: str, force: bool = False, user=Depends(current_user)
         return None
     s = await get_settings(user["business_id"])
     t = await transcript(cid, 40)
+    lang = "the same language the customer writes in (English if the customer writes in English)" if s.language == "auto" else s.language
     raw = await llm(s, f"You are a sales & support analyst for '{s.business_name}'. Business info: {s.business_info or '(not provided)'}",
-                    f"{SUMMARY_PROMPT}\n\nConversation:\n{t}")
+                    f"{SUMMARY_PROMPT} All values must be written in {lang}.\n\nConversation:\n{t}")
     m = re.search(r"\{.*\}", raw, re.S)
     try:
         data = json.loads(m.group(0)) if m else {}

@@ -1,0 +1,53 @@
+{
+  "summary": "Multi-tenant SaaS testing. Backend: new suite test_iter4_multitenant.py 17/17 PASS (signup + bcrypt $2b$, duplicate/validation, full tenant isolation on list/messages/reply/suggest/summary/PATCH/stats/settings incl. superadmin cannot read other tenant convs, public per-business info/chat/history, default bid, unknown bid 404, per-business LLM reply uses that business's info, telegram webhook 403 without/with wrong secret, messenger GET verify + POST HMAC per business and ingestion into correct tenant only, /admin/businesses superadmin-only (owners 403, anon 401), 3000-chat paging 100/page -> 3000 unique ids, telegram filter total 1000, search 'cappuccino', limit>100 -> 422, LT100 has 100 chats/>=100 AI replies). Register rate limit cannot be bypassed by spoofed X-Forwarded-For (verified). Legacy suites updated to new URLs: 20/23 pass in test_replyflow_api.py+TestSummary; remaining failures are outdated tests using old non-bid messenger webhook URL / old list response shape (not app bugs). Frontend: landing nav-signup/hero-get-started/login go-signup-link -> /signup; signup creates business and lands on dashboard with dash-business-name; duplicate email -> signup-error; Channels shows own business_id in messenger-callback-url and embed-code; /embed?b=<bid> chat got AI reply and landed only in that business; superadmin sees nav-businesses + table (4 businesses, 100/3000 counts, search works); owners have no nav-businesses; big inbox 3,000 chats, 50 initial, scroll loads +50 repeatedly up to 400 with no duplicates, load-more-btn works, list persists across 5s poll, old conversation opens, telegram filter 1,000, search debounced (single request) 241 matches; LT100 inbox 100 chats with AI reply; google buttons redirect to Google via auth.emergentagent.com; bogus session_id -> /login with error; admin regression (quick reply, suggest x3, suggestion->input, AI toggle, summary, settings save+reload, team access, channels) all OK; mobile 390px no horizontal overflow on signup/dashboard/admin.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "Telegram webhook for admin business (migration)", "issue": "Admin's live bot (Dev_nara_bot) webhook is still registered at .../api/webhooks/telegram/8605848445 (old URL scheme using bot id, not business_id). Current route treats '8605848445' as bid -> get_settings returns defaults (no token) -> every Telegram update gets 403. Telegram for the existing admin business is silently broken after the multi-tenant migration. /api/channels/status still reports connected:true because it only checks that webhook url is non-empty.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/channels/status", "issue": "telegram.connected should verify getWebhookInfo.url == f'{base}/api/webhooks/telegram/{bid}' (and optionally last_error_message), otherwise a stale/wrong webhook is shown as connected."},
+      {"endpoint": "Legacy endpoints", "issue": "Old /api/public/chat, /api/public/info, /api/webhooks/messenger (no bid) now 404. Any Meta app already configured with the old callback URL stops receiving messages; consider keeping legacy aliases mapped to the default business or forcing reconnect."},
+      {"endpoint": "POST /api/conversations/{cid}/summary", "issue": "LLM returned summary in Chinese for an English-only conversation (big-inbox 'Customer #2601': 'Do you sell coffee beans to take home?'). Make the language instruction explicit (detect from customer messages / pass settings.language) in SUMMARY_PROMPT."},
+      {"endpoint": "Rate limiting (RATE dict)", "issue": "In-memory per-process; resets on restart and is not shared across replicas/workers. Register limit 5/hour per IP also counts failed (duplicate-email) attempts, so a shared office/NAT IP can be blocked from signing up after a few typos."},
+      {"endpoint": "GET /api/conversations", "issue": "Cursor uses updated_at $lt only; conversations with identical updated_at at a page boundary would be skipped. No ties in current data, but use (updated_at, id) compound cursor for robustness."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Embed / ChatWidget", "issue": "/embed?b=<unknown-bid> shows an empty widget with repeated 'Unhandled rejection: Request failed with status code 404' (info + history polling not caught). Should show a friendly 'Chat unavailable' state and stop polling.", "selector": "[data-testid='embed-page']", "priority": "MEDIUM"},
+      {"component": "Dashboard routes", "issue": "Owner visiting /dashboard/businesses (or any unknown /dashboard/* path) gets a blank content area; add a catch-all <Route path='*' element={<Navigate to='/dashboard' />} />.", "selector": "/dashboard/businesses", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Inbox filter switch while scrolled", "issue": "Conversation list keeps its scroll position when changing filter/search; the scroll handler can fire loadMore with a 'before' cursor from the previous list (observed telegram filter showing 67 items instead of 50 right after switching). No gaps observed, but reset scrollTop to 0 on filter/q change and ignore stale loadMore responses.", "affected_selectors": ["[data-testid='conversation-list']", "[data-testid='filter-telegram']"]}
+    ],
+    "design_issues": [
+      {"screen": "Channels - Website chat", "issues": ["embed-code box overflows its column and the section divider on 1920px (long single-line code; extends past the content width). Use break-all / overflow-x-auto."]},
+      {"screen": "Admin Businesses", "issues": ["Chats/AI replies cells not formatted (3000 vs stat card 3,106) - use toLocaleString()."]},
+      {"screen": "Mobile dashboard", "issues": ["Business name (dash-business-name) not visible on mobile top bar; owners of multiple accounts can't tell which business they are in."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter4_multitenant.py", "/app/backend/tests/test_replyflow_api.py", "/app/backend/tests/test_iter2_security_widget_summary.py", "/app/test_reports/pytest/pytest_iter4.xml"],
+  "action_items": [
+    "HIGH: Re-register Telegram webhooks to /api/webhooks/telegram/{business_id} with new tg_secret for businesses that have telegram_token (do it in migrate_single_tenant/startup, or ask admin to click Save & connect); make channels_status verify webhook URL matches.",
+    "Handle 404/errors in ChatWidget (unknown business) with friendly message and stop polling.",
+    "Add catch-all route in Dashboard.",
+    "Reset conversation-list scroll on filter/search change; guard stale loadMore.",
+    "Make summary language explicit; optional legacy URL aliases; fix embed-code overflow; format admin numbers."
+  ],
+  "critical_code_review_comments": [
+    "telegram_webhook/messenger_* do not check business exists (fine, returns 403) but two businesses saving the same Telegram token would hijack each other's webhook - consider uniqueness check on telegram_token.",
+    "PUT /settings has no role check: Google team 'member' users can change tokens, allowed_emails and business name. Consider owner-only for channel tokens/team.",
+    "google_login joins the first settings doc containing the email in allowed_emails; if multiple businesses list the same email the choice is arbitrary.",
+    "Opening any conversation auto-triggers an LLM summary after 1.5s (cost scales with inbox browsing in large inboxes).",
+    "admin_businesses aggregates all messages each call and caps at 5000 businesses with no pagination.",
+    "Old test suites still reference non-bid messenger webhook URLs and list-shaped /api/conversations; superseded by test_iter4_multitenant.py."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter4_multitenant.py", "/app/backend/tests/test_replyflow_api.py (URLs -> /api/public/default/*, items shape)", "/app/backend/tests/test_iter2_security_widget_summary.py (URLs, widget assertion)"],
+  "success_rate": {"backend": "100% (17/17 new multi-tenant tests); legacy 20/23 (3 outdated tests)", "frontend": "~93% (all requested flows pass; unknown-bid embed error handling + blank route issues)"},
+  "test_credentials": "admin@replyflow.com/admin123 (superadmin), loadtest+706ab4fd@example.com/loadtest123, loadtest+82c7ca04@example.com/loadtest123",
+  "seed_data_creation": "All TEST_ businesses/users/conversations created during testing were deleted (incl. UI signup TEST_UI Bakery and 4 TEST web convs from legacy suites in admin business). Remaining: My Business + 2 loadtest businesses. One cached summary was generated on big-inbox 'Customer #2601'.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... pytest tests/test_iter4_multitenant.py -n 0. Register is limited 5/hour by real client IP (XFF spoof does not bypass); restart backend (sudo supervisorctl restart backend) to clear in-memory limits before UI signup tests. Admin business id da4f34c0-..., big inbox 9349429e-..., LT100 4f0dbc25-.... Admin Telegram webhook currently points to wrong URL (see critical).",
+  "rca of the issue": "Telegram: pre-migration code registered the webhook as /api/webhooks/telegram/<bot id prefix of token>. Migration (migrate_single_tenant) moved settings into a new business but never called setWebhook again; new route /webhooks/telegram/{bid} looks up settings by bid='8605848445' -> no settings -> empty token -> 403 'Bad secret'. Reproduce: curl https://api.telegram.org/bot<token>/getWebhookInfo -> url ends with /8605848445. Fix: on startup, for each settings with telegram_token, call setWebhook(url=.../telegram/{business_id}, secret_token=tg_secret(bid, token)) (needs public base URL) or prompt reconnect; tighten channels_status check."
+}

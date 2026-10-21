@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export const Section = ({ title, desc, children }) => (
   <section className="grid lg:grid-cols-[260px_1fr] gap-6 py-8 border-b border-white/5">
     <div><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-slate-400 mt-1">{desc}</p></div>
-    <div className="space-y-4">{children}</div>
+    <div className="space-y-4 min-w-0">{children}</div>
   </section>
 );
 

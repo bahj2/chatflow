@@ -23,17 +23,27 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [missing, setMissing] = useState(false);
   const end = useRef(null);
   const sid = useRef(sessionId(businessId));
 
-  const load = () => api.get(`/public/${businessId}/chat/${sid.current}`).then((r) => setMsgs(r.data.messages));
+  const load = () => api.get(`/public/${businessId}/chat/${sid.current}`).then((r) => setMsgs(r.data.messages)).catch(() => {});
 
   useEffect(() => {
-    api.get(`/public/${businessId}/info`).then((r) => setInfo(r.data));
-    load();
-    const t = setInterval(load, 5000);
+    let t;
+    api.get(`/public/${businessId}/info`).then((r) => {
+      setInfo(r.data);
+      load();
+      t = setInterval(load, 5000);
+    }).catch(() => setMissing(true));
     return () => clearInterval(t);
-  }, []);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (missing) return (
+    <div className={`grid place-items-center bg-[#0F1522] border border-white/10 rounded-2xl text-sm text-slate-400 p-6 text-center ${className}`} data-testid="chat-unavailable">
+      This chat is not available right now.
+    </div>
+  );
 
   useEffect(() => { const el = end.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
 

@@ -106,7 +106,7 @@ class TestWidget:
         r = s.get(f"{BASE_URL}/api/widget.js")
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("application/javascript")
-        assert "replyflow-bubble" in r.text and "/embed?site=" in r.text and "data-color" in r.text
+        assert "replyflow-bubble" in r.text and "/embed?b=" in r.text and "data-color" in r.text
 
 
 # --- Quick replies
@@ -127,7 +127,7 @@ class TestQuickReplies:
 # --- Public chat validation + rate limit (keep last: consumes IP budget)
 class TestPublicChatLimits:
     def test_text_too_long_422(self, s):
-        r = s.post(f"{BASE_URL}/api/public/chat", json={"session_id": f"TEST_long_{uuid.uuid4().hex[:6]}", "text": "a" * 2001})
+        r = s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": f"TEST_long_{uuid.uuid4().hex[:6]}", "text": "a" * 2001})
         assert r.status_code == 422
 
     def test_session_rate_limit_429(self, s, H):
@@ -138,7 +138,7 @@ class TestPublicChatLimits:
         s.put(f"{BASE_URL}/api/settings", json=st, headers=H)
         codes = []
         for i in range(7):
-            r = s.post(f"{BASE_URL}/api/public/chat", json={"session_id": sid, "text": f"ping {i}"}, timeout=60)
+            r = s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": sid, "text": f"ping {i}"}, timeout=60)
             codes.append(r.status_code)
             if r.status_code == 429:
                 detail = r.json().get("detail")

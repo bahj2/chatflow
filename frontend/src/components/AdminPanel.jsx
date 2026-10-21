@@ -52,8 +52,8 @@ export default function AdminPanel() {
                       <Facebook className={`h-4 w-4 ${b.messenger ? "text-[#0084FF]" : "text-slate-700"}`} />
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-1"><MessagesSquare className="h-3.5 w-3.5 text-slate-500" />{b.conversations}</span></td>
-                  <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-1"><Bot className="h-3.5 w-3.5 text-emerald-400" />{b.ai_replies}</span></td>
+                  <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-1"><MessagesSquare className="h-3.5 w-3.5 text-slate-500" />{b.conversations.toLocaleString()}</span></td>
+                  <td className="px-4 py-3 text-right"><span className="inline-flex items-center gap-1"><Bot className="h-3.5 w-3.5 text-emerald-400" />{b.ai_replies.toLocaleString()}</span></td>
                   <td className="px-4 py-3 text-slate-400">{new Date(b.created_at).toLocaleDateString()}</td>
                 </tr>
               ))}

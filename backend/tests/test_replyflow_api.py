@@ -70,7 +70,7 @@ class TestSettings:
         assert r.status_code == 200
         g = s.get(f"{BASE_URL}/api/settings", headers=H).json()
         assert g["business_name"] == "TEST_Shop" and g["model"] == "gemini" and g["faqs"][0]["q"].startswith("Do you ship")
-        assert s.get(f"{BASE_URL}/api/public/info").json()["business_name"] == "TEST_Shop"
+        assert s.get(f"{BASE_URL}/api/public/default/info").json()["business_name"] == "TEST_Shop"
 
     def test_ai_test_uses_faq_gemini(self, s, H):
         r = s.post(f"{BASE_URL}/api/ai/test", json={"text": "Do you ship to Mars? how much?"}, headers=H, timeout=60)
@@ -91,24 +91,24 @@ class TestChatInbox:
     cid = None
 
     def test_public_chat_ai_reply(self, s):
-        r = s.post(f"{BASE_URL}/api/public/chat", json={"session_id": self.sid, "text": "Hi, what are your hours?"}, timeout=60)
+        r = s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": self.sid, "text": "Hi, what are your hours?"}, timeout=60)
         assert r.status_code == 200
         rep = r.json()["reply"]
         assert rep and rep["role"] == "ai" and rep["text"]
-        h = s.get(f"{BASE_URL}/api/public/chat/{self.sid}").json()["messages"]
+        h = s.get(f"{BASE_URL}/api/public/default/chat/{self.sid}").json()["messages"]
         assert [m["role"] for m in h] == ["user", "ai"]
 
     def test_empty_message(self, s):
-        assert s.post(f"{BASE_URL}/api/public/chat", json={"session_id": self.sid, "text": "  "}).status_code == 400
+        assert s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": self.sid, "text": "  "}).status_code == 400
 
     def test_inbox_lists_and_filters(self, s, H):
-        convs = s.get(f"{BASE_URL}/api/conversations", params={"channel": "web"}, headers=H).json()
+        convs = s.get(f"{BASE_URL}/api/conversations", params={"channel": "web"}, headers=H).json()["items"]
         c = next(c for c in convs if c["external_id"] == self.sid)
         TestChatInbox.cid = c["id"]
         assert c["channel"] == "web" and c["ai_enabled"] is True
-        tg = s.get(f"{BASE_URL}/api/conversations", params={"channel": "telegram"}, headers=H).json()
+        tg = s.get(f"{BASE_URL}/api/conversations", params={"channel": "telegram"}, headers=H).json()["items"]
         assert all(x["channel"] == "telegram" for x in tg)
-        q = s.get(f"{BASE_URL}/api/conversations", params={"q": "what are your hours"}, headers=H).json()
+        q = s.get(f"{BASE_URL}/api/conversations", params={"q": "what are your hours"}, headers=H).json()["items"]
         assert isinstance(q, list)
 
     def test_suggest(self, s, H):
@@ -119,16 +119,16 @@ class TestChatInbox:
     def test_manual_reply_visible_publicly(self, s, H):
         r = s.post(f"{BASE_URL}/api/conversations/{self.cid}/reply", json={"text": "TEST_agent hello"}, headers=H)
         assert r.status_code == 200 and r.json()["role"] == "agent"
-        h = s.get(f"{BASE_URL}/api/public/chat/{self.sid}").json()["messages"]
+        h = s.get(f"{BASE_URL}/api/public/default/chat/{self.sid}").json()["messages"]
         assert h[-1]["text"] == "TEST_agent hello"
 
     def test_ai_toggle(self, s, H):
         r = s.patch(f"{BASE_URL}/api/conversations/{self.cid}", json={"ai_enabled": False}, headers=H)
         assert r.status_code == 200 and r.json()["ai_enabled"] is False
-        r = s.post(f"{BASE_URL}/api/public/chat", json={"session_id": self.sid, "text": "are you there?"}, timeout=60)
+        r = s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": self.sid, "text": "are you there?"}, timeout=60)
         assert r.json()["reply"] is None
         s.patch(f"{BASE_URL}/api/conversations/{self.cid}", json={"ai_enabled": True}, headers=H)
-        r = s.post(f"{BASE_URL}/api/public/chat", json={"session_id": self.sid, "text": "hello again"}, timeout=60)
+        r = s.post(f"{BASE_URL}/api/public/default/chat", json={"session_id": self.sid, "text": "hello again"}, timeout=60)
         assert r.json()["reply"]["role"] == "ai"
 
     def test_404s(self, s, H):

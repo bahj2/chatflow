@@ -15,7 +15,7 @@ const when = (iso) => {
   return d.toDateString() === new Date().toDateString() ? time(iso) : d.toLocaleDateString([], { day: "numeric", month: "short" });
 };
 
-const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ, total, hasMore, onMore, loadingMore }) => (
+const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ, total, hasMore, onMore, loadingMore, listRef }) => (
   <div className="flex flex-col h-full border-r border-white/5 bg-[#0D121C]">
     <div className="p-4 space-y-3 border-b border-white/5">
       <h1 className="font-display text-xl font-bold flex items-baseline gap-2">Inbox <span className="text-xs font-mono text-slate-500" data-testid="inbox-total">{total.toLocaleString()} chats</span></h1>
@@ -31,7 +31,7 @@ const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ, total, ha
         ))}
       </div>
     </div>
-    <div className="flex-1 overflow-y-auto" data-testid="conversation-list"
+    <div ref={listRef} className="flex-1 overflow-y-auto" data-testid="conversation-list"
       onScroll={(e) => { const el = e.currentTarget; if (hasMore && !loadingMore && el.scrollTop + el.clientHeight > el.scrollHeight - 300) onMore(); }}>
       {convs.length === 0 && <p className="p-6 text-sm text-slate-500" data-testid="inbox-empty">No conversations yet. Try the chat on your website!</p>}
       {convs.map((c) => (
@@ -214,6 +214,8 @@ export default function Inbox() {
   const [firstMore, setFirstMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const listRef = useRef(null);
+  const gen = useRef(0);
 
   useEffect(() => { const t = setTimeout(() => setDq(q), 300); return () => clearTimeout(t); }, [q]);
   const params = { channel: filter, q: dq || undefined };
@@ -226,9 +228,11 @@ export default function Inbox() {
   const loadMore = async () => {
     const last = merged[merged.length - 1];
     if (!last) return;
+    const g = gen.current;
     setLoadingMore(true);
     try {
-      const { data } = await api.get("/conversations", { params: { ...params, before: last.updated_at } });
+      const { data } = await api.get("/conversations", { params: { ...params, before: last.updated_at, before_id: last.id } });
+      if (g !== gen.current) return;
       setOlder((o) => [...o, ...data.items]);
       setOlderMore(data.has_more);
     } finally { setLoadingMore(false); }
@@ -237,8 +241,10 @@ export default function Inbox() {
   useEffect(() => { api.get("/settings").then((r) => setQuick((r.data.quick_replies || []).filter((x) => x.label && x.text))); }, []);
 
   useEffect(() => {
+    gen.current += 1;
     setOlder([]);
     setOlderMore(null);
+    if (listRef.current) listRef.current.scrollTop = 0;
     const load = () => api.get("/conversations", { params }).then((r) => {
       setConvs(r.data.items);
       setFirstMore(r.data.has_more);
@@ -252,7 +258,7 @@ export default function Inbox() {
   return (
     <div className="h-full grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] overflow-hidden">
       <div className={`${active ? "hidden md:block" : ""} min-h-0 min-w-0 overflow-hidden`}>
-        <ConvList convs={merged} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} total={total} hasMore={hasMore} onMore={loadMore} loadingMore={loadingMore} />
+        <ConvList convs={merged} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} total={total} hasMore={hasMore} onMore={loadMore} loadingMore={loadingMore} listRef={listRef} />
       </div>
       <div className={`${active ? "" : "hidden md:grid place-items-center"} min-h-0 min-w-0 h-full`}>
         {active ? <ChatView conv={active} onBack={() => setActive(null)} onChange={setActive} quick={quick} />

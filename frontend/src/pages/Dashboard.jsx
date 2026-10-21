@@ -1,4 +1,4 @@
-import { NavLink, Routes, Route, Link } from "react-router-dom";
+import { NavLink, Routes, Route, Link, Navigate } from "react-router-dom";
 import { Inbox as InboxIcon, Settings2, Plug, LogOut, Zap, ExternalLink, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import Inbox from "@/components/Inbox";
@@ -22,6 +22,7 @@ export default function Dashboard() {
           <span className="h-8 w-8 rounded-lg bg-emerald-500 text-slate-950 grid place-items-center"><Zap className="h-4 w-4" /></span>
           <span className="hidden lg:inline">ReplyFlow</span>
         </Link>
+        <span className="md:hidden text-sm font-semibold truncate max-w-[110px]" data-testid="dash-business-name-mobile">{user.business_name}</span>
         <div className="hidden lg:block px-3 pb-4 -mt-3" data-testid="dash-business-name">
           <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Business</p>
           <p className="text-sm font-semibold truncate">{user.business_name}</p>
@@ -47,6 +48,7 @@ export default function Dashboard() {
           <Route path="settings" element={<SettingsPanel />} />
           <Route path="channels" element={<ChannelsPanel />} />
           {user.role === "superadmin" && <Route path="businesses" element={<AdminPanel />} />}
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
     </div>
