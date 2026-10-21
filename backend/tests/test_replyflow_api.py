@@ -155,18 +155,9 @@ class TestWebhooks:
         psid = f"TEST{uuid.uuid4().hex[:10]}"
         payload = {"object": "page", "entry": [{"id": "1", "time": 1, "messaging": [
             {"sender": {"id": psid}, "recipient": {"id": "1"}, "timestamp": 1, "message": {"mid": "m1", "text": "Hello from messenger, do you ship to Mars?"}}]}]}
+        # Since iteration 2, unsigned payloads must be rejected (signed flow: test_iter2_security_widget_summary.py)
         r = s.post(f"{BASE_URL}/api/webhooks/messenger", json=payload)
-        assert r.status_code == 200
-        conv = None
-        for _ in range(20):
-            time.sleep(1.5)
-            convs = s.get(f"{BASE_URL}/api/conversations", params={"channel": "messenger"}, headers=H).json()
-            conv = next((c for c in convs if c["external_id"] == psid), None)
-            if conv and conv.get("last_role") == "ai":
-                break
-        assert conv is not None
-        msgs = s.get(f"{BASE_URL}/api/conversations/{conv['id']}/messages", headers=H).json()
-        assert [m["role"] for m in msgs] == ["user", "ai"]
+        assert r.status_code == 403
 
     def test_telegram_bad_secret(self, s):
         r = s.post(f"{BASE_URL}/api/webhooks/telegram/123", json={"message": {"text": "hi", "chat": {"id": 1}}})

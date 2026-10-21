@@ -1,0 +1,45 @@
+{
+  "summary": "Iteration 2 tested the new features (Messenger HMAC signature check, public chat rate limit, widget.js embed, quick replies, AI customer summary) plus regressions. Backend: 11/11 new pytest tests pass when run serially (-n 0). The per-IP limit works (the 21st request returned 429), BUT a spoofed X-Forwarded-For header bypasses it completely (23 of 23 returned 200). Frontend: all requested flows work. On the external page the widget bubble uses data-color, the iframe goes to /embed?site=<host>, the AI replies, and the conversation shows in the inbox as 'Visitor from <host>'. The 429 text shows as a bot bubble. The summary panel at 1920px and the summary strip at 1100px and 390px work, refresh regenerates, and intent badges appear in the list. Quick-reply chips send the text in one tap. Quick-reply settings persist after reload. Channels embed code, the app secret field and the 'Configured' status logic are correct. Mobile 390px has no horizontal overflow. Login, suggest, manual reply and AI toggle all work. Test data was cleaned up and settings restored (fb secrets empty, auto_reply on, default quick replies).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/public/chat", "issue": "The per-IP rate limit can be bypassed. ip = first value of X-Forwarded-For, which the client controls; the ingress appends to it rather than replacing it. Sending 'X-Forwarded-For: <random>' with a new session_id each time gives unlimited LLM calls (verified: 23 of 23 returned 200 with spoofed XFF; without spoofing the 21st returned 429). Fix: use the right-most XFF entry (the one added by the trusted ingress) or request.client.host, never the left-most.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "rate_ok / RATE dict", "issue": "Memory grows without limit. Each new session_id/IP key stays in RATE forever (empty deques are never removed). Prune empty keys. The limiter is also per-process, so it does not work across multiple workers."},
+      {"endpoint": "rate_ok", "issue": "The checks are chained with 'and', so a session slot is used up even when the IP check then rejects. Minor fairness issue."},
+      {"endpoint": "POST /api/webhooks/messenger", "issue": "With a valid signature, a body that is not JSON makes json.loads raise and return a 500. Wrap it and return 400."},
+      {"endpoint": "POST /api/conversations/{id}/summary", "issue": "Returns null (200) when there are no user messages. The frontend handles this, but the API contract is unclear."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Inbox ChatView header", "issue": "After toggling AI, the sonner success toast (top-right) sits over the ai-toggle-switch for about 4s. A second click within that time is blocked (Playwright: the toast intercepts pointer events). Move the Toaster to bottom-right/top-center or add an offset.", "selector": "[data-testid=ai-toggle-switch]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inbox summary strip (<1280px)", "issues": ["The StageTag 'Hot lead' wraps onto two lines inside the strip. Add whitespace-nowrap/shrink-0 to StageTag."]},
+      {"screen": "Channels > Website chat", "issues": ["The embed-code CopyBox overflows its column by about 24px (the copy button sticks out past the right edge). The <code> has flex-1 truncate but no min-w-0, so it never truncates."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter2_security_widget_summary.py", "/app/backend/tests/test_replyflow_api.py", "/app/test_reports/pytest/pytest_iter2.xml"],
+  "action_items": [
+    "HIGH: Get the client IP from a trusted source (right-most X-Forwarded-For entry / ingress header), not the client-supplied left-most value",
+    "Remove empty RATE keys to avoid unbounded memory growth",
+    "Move or offset the toaster so it does not cover the AI toggle switch",
+    "Add whitespace-nowrap to StageTag; add min-w-0 to the CopyBox <code>",
+    "Return 400 instead of 500 for a non-JSON body on a signed Messenger webhook"
+  ],
+  "critical_code_review_comments": [
+    "Spoofable X-Forwarded-For makes the IP rate limit ineffective (see critical issue)",
+    "ChatWidget sessionId() reads localStorage with no try/catch. In third-party iframes with storage blocked (Safari/strict privacy settings), localStorage access can throw and break the embed. Wrap it in try/catch with an in-memory fallback.",
+    "Embed visitor name comes from the ?site= query parameter, which the client controls. This is cosmetic only, but it can be spoofed.",
+    "Messenger HMAC uses hmac.compare_digest on the raw body. This is correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter2_security_widget_summary.py (new)", "/app/backend/tests/test_replyflow_api.py (unsigned messenger ingest now expects 403)"],
+  "success_rate": {"backend": "100% of feature tests (11/11); 1 security bypass found", "frontend": "95%"},
+  "test_credentials": "admin@replyflow.com / admin123 (works)",
+  "seed_data_creation": "All TEST_* web/messenger conversations and the 'Visitor from ...' conversation were deleted from MongoDB. Settings restored to defaults.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "/app/backend/pytest.ini enables xdist. Run with '-n 0', otherwise the tests race on the shared settings document. Rate limits are in-memory per IP (20/min); the test machine and the Playwright browser share the same IP, so wait 60s between bursts. Re-verify the XFF spoof fix by sending 23 public chat posts with random X-Forwarded-For values and new session_ids (with auto_reply off); expect 429 after 20."
+}

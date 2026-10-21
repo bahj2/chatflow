@@ -8,8 +8,8 @@ import { Section, Field } from "@/components/SettingsPanel";
 const embedCode = `<script src="${BACKEND_URL}/api/widget.js" async></script>`;
 
 const CopyBox = ({ value, testid }) => (
-  <div className="flex gap-2">
-    <code className="flex-1 truncate rounded-lg bg-slate-900 border border-white/10 px-3 py-2 text-xs font-mono text-slate-300" data-testid={testid}>{value}</code>
+  <div className="flex gap-2 min-w-0">
+    <code className="flex-1 min-w-0 truncate rounded-lg bg-slate-900 border border-white/10 px-3 py-2 text-xs font-mono text-slate-300" data-testid={testid}>{value}</code>
     <button onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }} data-testid={`${testid}-copy`}
       className="shrink-0 rounded-lg border border-white/10 px-3 hover:bg-white/5"><Copy className="h-4 w-4" /></button>
   </div>

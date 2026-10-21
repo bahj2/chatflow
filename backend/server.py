@@ -282,14 +282,31 @@ async def public_info():
 RATE = {}
 
 
-def rate_ok(key: str, limit: int, window: int) -> bool:
+PROXY_HOPS = 2  # Cloudflare + load balancer append after the real client IP
+
+
+def client_ip(request: Request) -> str:
+    parts = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    if len(parts) > PROXY_HOPS:
+        return parts[-(PROXY_HOPS + 1)]
+    return parts[0] if parts else request.client.host
+
+
+def rate_ok(rules) -> bool:
     now = time.time()
-    q = RATE.setdefault(key, deque())
-    while q and q[0] < now - window:
-        q.popleft()
-    if len(q) >= limit:
-        return False
-    q.append(now)
+    if len(RATE) > 20000:
+        for k in [k for k, q in RATE.items() if not q or q[-1] < now - 3600]:
+            RATE.pop(k, None)
+    queues = []
+    for key, limit, window in rules:
+        q = RATE.setdefault(key, deque())
+        while q and q[0] < now - window:
+            q.popleft()
+        if len(q) >= limit:
+            return False
+        queues.append(q)
+    for q in queues:
+        q.append(now)
     return True
 
 
@@ -297,8 +314,8 @@ def rate_ok(key: str, limit: int, window: int) -> bool:
 async def public_chat(body: PublicChatIn, request: Request):
     if not body.text.strip():
         raise HTTPException(400, "Empty message")
-    ip = (request.headers.get("x-forwarded-for") or request.client.host).split(",")[0].strip()
-    if not (rate_ok(f"s:{body.session_id}", 6, 60) and rate_ok(f"ip:{ip}", 20, 60) and rate_ok(f"iph:{ip}", 150, 3600)):
+    ip = client_ip(request)
+    if not rate_ok([(f"s:{body.session_id}", 6, 60), (f"ip:{ip}", 20, 60), (f"iph:{ip}", 150, 3600)]):
         raise HTTPException(429, "You're sending messages too fast. Please wait a moment and try again.")
     msg = await handle_incoming("web", body.session_id, body.name or "Website visitor", body.text.strip())
     return {"reply": msg}
@@ -348,7 +365,10 @@ async def messenger_webhook(request: Request, bg: BackgroundTasks):
     expected = "sha256=" + hmac.new(s.fb_app_secret.encode(), raw, hashlib.sha256).hexdigest()
     if not s.fb_app_secret or not hmac.compare_digest(request.headers.get("X-Hub-Signature-256", ""), expected):
         raise HTTPException(403, "Invalid signature")
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "Invalid JSON")
     for entry in data.get("entry", []):
         for ev in entry.get("messaging", []):
             text = (ev.get("message") or {}).get("text")
@@ -556,3 +576,4 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+

@@ -17,7 +17,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Channels: Telegram token → auto setWebhook (secret_token header check); Messenger callback URL, verify token, page token; webhooks ingest + AI reply + send back
 - Tested: backend 20/20, frontend flows pass
 
+## Iteration 2 (2026-06)
+- Messenger webhook verifies X-Hub-Signature-256 with App secret (rejects otherwise)
+- Website chat rate limit: 6/min per session, 20/min + 150/h per IP (real IP = XFF[-3], spoof-proof)
+- Embed code `<script src=".../api/widget.js" async>` (data-color, data-position) → iframe /embed?site=host
+- Quick replies (Settings) → one-tap send chips in inbox composer
+- AI customer summary (intent, stage, details, next step), cached by message count; side panel ≥1280px, strip below, intent tag in list
+- Tested: iteration_2 all flows pass; XFF bypass fixed after
+
 ## Backlog
-- P1: Messenger X-Hub-Signature-256 check (app secret); rate limit public chat
-- P1: Embeddable widget script for external websites
-- P2: Customer context panel (intent, summary), quick-reply templates, Instagram/WhatsApp, analytics
+- P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
+- P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

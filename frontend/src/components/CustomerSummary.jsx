@@ -9,7 +9,7 @@ const STAGE = {
 };
 
 export const StageTag = ({ stage }) => (
-  <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STAGE[stage] || "text-amber-300 bg-amber-500/10 border-amber-500/30"}`} data-testid="summary-stage">{stage}</span>
+  <span className={`inline-block shrink-0 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STAGE[stage] || "text-amber-300 bg-amber-500/10 border-amber-500/30"}`} data-testid="summary-stage">{stage}</span>
 );
 
 export const SummaryStrip = ({ summary, loading }) => (
