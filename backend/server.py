@@ -88,6 +88,7 @@ class Settings(BaseModel):
     fb_verify_token: str = ""
     fb_app_secret: str = ""
     quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])
+    allowed_emails: List[str] = []
 
 
 class PublicChatIn(BaseModel):
@@ -146,12 +147,42 @@ async def login(body: LoginIn, request: Request):
     if att and att.get("count", 0) >= 5 and datetime.fromisoformat(att["last"]) > datetime.now(timezone.utc) - timedelta(minutes=15):
         raise HTTPException(429, "Too many attempts. Try again in 15 minutes.")
     user = await db.users.find_one({"email": email})
-    if not user or not verify_pw(body.password, user["password_hash"]):
+    if not user or not user.get("password_hash") or not verify_pw(body.password, user["password_hash"]):
         await db.login_attempts.update_one({"identifier": ident}, {"$inc": {"count": 1}, "$set": {"last": now_iso()}}, upsert=True)
         raise HTTPException(401, "Invalid email or password")
     await db.login_attempts.delete_one({"identifier": ident})
-    token = jwt.encode({"sub": user["id"], "email": email, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, JWT_SECRET, algorithm=JWT_ALG)
-    return {"token": token, "user": {"id": user["id"], "email": email, "name": user.get("name"), "role": user.get("role")}}
+    return issue_token(user)
+
+
+def issue_token(user: dict) -> dict:
+    token = jwt.encode({"sub": user["id"], "email": user["email"], "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, JWT_SECRET, algorithm=JWT_ALG)
+    return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user.get("name"), "picture": user.get("picture"), "role": user.get("role")}}
+
+
+class GoogleIn(BaseModel):
+    session_id: str
+
+
+@api.post("/auth/google")
+async def google_login(body: GoogleIn):
+    async with httpx.AsyncClient(timeout=20) as h:
+        r = await h.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data", headers={"X-Session-ID": body.session_id})
+    if r.status_code != 200:
+        raise HTTPException(401, "Google sign-in failed. Please try again.")
+    g = r.json()
+    email = g["email"].strip().lower()
+    s = await get_settings()
+    allowed = {e.strip().lower() for e in s.allowed_emails} | {os.environ['ADMIN_EMAIL'].lower()}
+    if email not in allowed:
+        raise HTTPException(403, f"{email} is not allowed. Sign in with your password and add it in AI Settings → Team access.")
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if user:
+        await db.users.update_one({"email": email}, {"$set": {"picture": g.get("picture"), "name": user.get("name") or g.get("name")}})
+        user["picture"] = g.get("picture")
+    else:
+        user = {"id": str(uuid.uuid4()), "email": email, "name": g.get("name"), "picture": g.get("picture"), "role": "admin", "auth": "google", "created_at": now_iso()}
+        await db.users.insert_one(dict(user))
+    return issue_token(user)
 
 
 @api.get("/auth/me")

@@ -24,20 +24,24 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    // Returning from Google: AuthCallback exchanges session_id first
+    if (window.location.hash?.includes("session_id=")) return;
     if (!localStorage.getItem("rf_token")) return setUser(false);
     api.get("/auth/me").then((r) => setUser(r.data)).catch(() => setUser(false));
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const save = (data) => {
     localStorage.setItem("rf_token", data.token);
     setUser(data.user);
   };
+  const login = async (email, password) => save((await api.post("/auth/login", { email, password })).data);
+  const loginGoogle = async (session_id) => save((await api.post("/auth/google", { session_id })).data);
+  const failGoogle = () => setUser(false);
   const logout = () => {
     localStorage.removeItem("rf_token");
     setUser(false);
   };
-  return <AuthCtx.Provider value={{ user, login, logout }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, login, loginGoogle, failGoogle, logout }}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

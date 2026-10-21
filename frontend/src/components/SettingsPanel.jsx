@@ -50,12 +50,19 @@ const Tester = () => {
 export default function SettingsPanel() {
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
   useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); }, []);
   if (!s) return <div className="p-8 text-slate-500">Loading…</div>;
 
   const set = (k) => (v) => setS({ ...s, [k]: v?.target ? v.target.value : v });
   const setFaq = (i, k, v) => setS({ ...s, faqs: s.faqs.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
   const setQr = (i, k, v) => setS({ ...s, quick_replies: s.quick_replies.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
+  const addEmail = () => {
+    const em = newEmail.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(em)) return toast.error("Enter a valid email");
+    if (!s.allowed_emails.includes(em)) setS({ ...s, allowed_emails: [...s.allowed_emails, em] });
+    setNewEmail("");
+  };
   const save = async () => {
     setSaving(true);
     try { await api.put("/settings", s); toast.success("Settings saved"); } catch (e) { toast.error(errMsg(e)); } finally { setSaving(false); }
@@ -99,6 +106,23 @@ export default function SettingsPanel() {
           ))}
           <button onClick={() => setS({ ...s, faqs: [...s.faqs, { q: "", a: "" }] })} data-testid="add-faq-btn"
             className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
+        </Section>
+
+        <Section title="Team access" desc="Google accounts allowed to sign in to this dashboard with “Continue with Google”.">
+          <div className="flex gap-2">
+            <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@gmail.com" type="email" data-testid="allowed-email-input"
+              onKeyDown={(e) => e.key === "Enter" && addEmail()} />
+            <button onClick={addEmail} data-testid="add-allowed-email-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-4 text-sm hover:bg-white/5"><Plus className="h-4 w-4" /> Add</button>
+          </div>
+          <div className="flex flex-wrap gap-2" data-testid="allowed-emails-list">
+            {s.allowed_emails.length === 0 && <p className="text-xs text-slate-500">No Google accounts yet — add your Gmail, then click Save.</p>}
+            {s.allowed_emails.map((em) => (
+              <span key={em} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0F1522] pl-3 pr-1.5 py-1 text-sm" data-testid={`allowed-email-${em}`}>
+                {em}
+                <button onClick={() => setS({ ...s, allowed_emails: s.allowed_emails.filter((x) => x !== em) })} data-testid={`remove-allowed-email-${em}`} className="text-slate-500 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+              </span>
+            ))}
+          </div>
         </Section>
 
         <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
