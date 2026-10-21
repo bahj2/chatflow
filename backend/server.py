@@ -25,6 +25,7 @@ from fastapi.responses import Response
 from collections import deque
 import hashlib
 import hmac
+import secrets
 import time
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
@@ -877,19 +878,78 @@ class VoxCheckIn(BaseModel):
     key: str = ""
 
 
-@api.post("/voice/voxcpm-check")
-async def voxcpm_check(body: VoxCheckIn, user=Depends(current_user)):
-    if not body.url.startswith("https://"):
+async def vox_health(url: str, key: str) -> dict:
+    if not url.startswith("https://"):
         return {"ok": False, "error": "The address must start with https://"}
-    if not await public_https(body.url):
+    if not await public_https(url):
         return {"ok": False, "error": "This address is not allowed (private or internal network)"}
     try:
         async with httpx.AsyncClient(timeout=30) as h:
-            r = await h.get(f"{body.url.rstrip('/')}/health", headers={"Authorization": f"Bearer {body.key}"} if body.key else {})
+            r = await h.get(f"{url.rstrip('/')}/health", headers={"Authorization": f"Bearer {key}"} if key else {})
         r.raise_for_status()
-        return {"ok": True, **r.json()}
+        return {**r.json(), "ok": True}
     except Exception as e:
         return {"ok": False, "error": vox_msg(e)}
+
+
+@api.post("/voice/voxcpm-check")
+async def voxcpm_check(body: VoxCheckIn, user=Depends(current_user)):
+    return await vox_health(body.url, body.key)
+
+
+# ---------- VoxCPM2 auto-connect (Colab / Modal script reports back) ----------
+class VoxPairIn(BaseModel):
+    stage: Literal["started", "gpu", "no_gpu", "installing", "loading", "linking", "ready", "alive", "error"]
+    source: Literal["colab", "modal"] = "colab"
+    url: str = Field("", max_length=300)
+    key: str = Field("", max_length=200)
+    error: str = Field("", max_length=500)
+
+
+def pair_view(p: dict, s: Settings) -> dict:
+    stage = p.get("stage", "waiting")
+    seen = p.get("seen_at")
+    if stage == "ready" and p.get("source") == "colab" and seen and datetime.fromisoformat(seen) < datetime.now(timezone.utc) - timedelta(minutes=15):
+        stage = "offline"
+    if stage == "ready" and s.voxcpm_url != p.get("url"):
+        stage = "waiting"
+    return {"token": p["token"], "stage": stage, "error": p.get("error", ""), "gpu": p.get("gpu", ""), "source": p.get("source", "colab"),
+            "url": s.voxcpm_url, "key": s.voxcpm_key, "seen_at": seen}
+
+
+@api.get("/voice/voxcpm-pair")
+async def voxcpm_pair(user=Depends(current_user)):
+    bid = user["business_id"]
+    p = await db.voxcpm_pairs.find_one({"business_id": bid}, {"_id": 0})
+    if not p:
+        p = {"business_id": bid, "token": secrets.token_urlsafe(24), "stage": "waiting", "created_at": now_iso()}
+        await db.voxcpm_pairs.update_one({"business_id": bid}, {"$setOnInsert": p}, upsert=True)
+        p = await db.voxcpm_pairs.find_one({"business_id": bid}, {"_id": 0})
+    return pair_view(p, await get_settings(bid))
+
+
+@api.post("/voice/voxcpm-pair/{token}")
+async def voxcpm_pair_report(token: str, body: VoxPairIn, request: Request):
+    if not rate_ok([(f"vpair:{client_ip(request)}", 120, 3600)]):
+        raise HTTPException(429, "Too many requests. Try again later.")
+    p = await db.voxcpm_pairs.find_one({"token": token}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "This setup code is not valid. Copy the code again from ReplyFlow.")
+    if body.stage == "alive":
+        if p.get("stage") == "ready":
+            await db.voxcpm_pairs.update_one({"token": token}, {"$set": {"seen_at": now_iso()}})
+        return {"ok": True}
+    upd = {"stage": body.stage, "source": body.source, "error": body.error, "seen_at": now_iso()}
+    if body.stage == "ready":
+        url = body.url.strip().rstrip("/")
+        chk = await vox_health(url, body.key)
+        if not chk["ok"]:
+            await db.voxcpm_pairs.update_one({"token": token}, {"$set": {**upd, "stage": "error", "error": f"ReplyFlow could not reach the server: {chk['error']}"}})
+            raise HTTPException(400, f"ReplyFlow could not reach the server: {chk['error']}")
+        await db.settings.update_one({"business_id": p["business_id"]}, {"$set": {"voxcpm_url": url, "voxcpm_key": body.key}}, upsert=True)
+        upd.update(url=url, gpu=str(chk.get("gpu", ""))[:100])
+    await db.voxcpm_pairs.update_one({"token": token}, {"$set": upd})
+    return {"ok": True}
 
 
 @api.get("/stats")
@@ -1027,6 +1087,8 @@ async def startup():
     await db.users.create_index("id", unique=True)
     await db.products.create_index([("business_id", 1), ("is_deleted", 1), ("created_at", -1)])
     await db.media.create_index("id", unique=True)
+    await db.voxcpm_pairs.create_index("token", unique=True)
+    await db.voxcpm_pairs.create_index("business_id", unique=True)
     try:
         M.init_storage()
     except Exception as e:
