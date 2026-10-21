@@ -29,6 +29,15 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Emergent-managed Google login added alongside email/password; only emails in AI Settings → Team access (settings.allowed_emails) + ADMIN_EMAIL may sign in; both methods issue the same JWT
 - Tested: iteration_3 pass; minor fixes (login lockout uses real client IP, allowed_emails normalised server-side, Google errors → 401/502)
 
+## Iteration 4 (2026-06) — Multi-business SaaS + scale
+- Self sign-up (/signup, email+password or Google) → each signup gets its own business: settings, AI, quick replies, team, Telegram/Messenger, inbox, embed code
+- All data scoped by business_id (tenant isolation verified); old single-tenant data migrated into admin's business; admin = superadmin with Businesses overview page
+- Per-business URLs: /api/public/{bid}/..., /api/webhooks/telegram/{bid}, /api/webhooks/messenger/{bid}, widget.js data-business
+- Inbox paging (50/page, compound cursor, infinite scroll, total count, debounced search); indexes added; AI reply retries (3x)
+- Load test (scripts/load_test_100.py): 100 simultaneous chats → 100/100 AI replies, 6.7s total, p50 5.5s, p95 6.6s; 3,000-chat inbox: page ≈47ms, search ≈60ms
+- Admin's real bot @Dev_nara_bot webhook re-pointed to new URL after migration
+- Tested: iteration_4 + iteration_5 pass
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

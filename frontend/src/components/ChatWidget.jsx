@@ -39,13 +39,13 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
     return () => clearInterval(t);
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { const el = end.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
+
   if (missing) return (
     <div className={`grid place-items-center bg-[#0F1522] border border-white/10 rounded-2xl text-sm text-slate-400 p-6 text-center ${className}`} data-testid="chat-unavailable">
       This chat is not available right now.
     </div>
   );
-
-  useEffect(() => { const el = end.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs, busy]);
 
   const send = async (e) => {
     e.preventDefault();

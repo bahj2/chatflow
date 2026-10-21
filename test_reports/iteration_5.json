@@ -1,0 +1,29 @@
+{
+  "summary": "Checked the fixes from iteration 4. Backend: 9/9 new tests passed (test_iter5_fixes.py) and 17/17 iteration 4 regression tests passed. Admin Telegram shows connected with bot @Dev_nara_bot. Owners with no token show connected=false. The admin webhook returns 403 when the secret header is missing or wrong. Walking all 3,000 big-inbox chats with the before+before_id cursor gave no duplicates or gaps, and the 1,000 telegram chats did too. The English conversation got an English summary. Frontend: found and fixed one CRITICAL bug in ChatWidget.jsx: a useEffect was declared after the early return for the chat-unavailable state. This broke React's Rules of Hooks, so /embed?b=<unknown> crashed with 'Rendered fewer hooks than expected', and the ESLint error put a 'Compiled with problems' overlay over the whole app in dev. After the fix, the embed shows the 'chat unavailable' message and makes no polling requests. All other items pass: the Channels page shows 'Webhook connected' and the bot name; owner visits to /dashboard/businesses and /dashboard/anything redirect to /dashboard; switching filter or search resets scrollTop to 0, and the telegram filter shows exactly 50 items with a total of 1,000 even after a deep scroll and a 5s poll; scrolling to 350 items gave no duplicates; the embed-code box fits its column at 1920px; the admin table shows 3,000; the mobile business name is visible at 390px with no horizontal overflow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ChatWidget ChatPanel", "issue": "FIXED by testing agent: useEffect called after the early return for the missing state, which crashed /embed for unknown businesses and caused an ESLint compile-error overlay", "selector": "[data-testid='chat-unavailable']", "priority": "CRITICAL (fixed)"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter5_fixes.py", "/app/backend/tests/test_iter4_multitenant.py", "/app/test_reports/pytest/pytest_iter5.xml"],
+  "action_items": [
+    "Review the ChatWidget.jsx hook-order fix the testing agent applied, and keep all hooks above early returns",
+    "Optional: in ChatPanel, the interval is created inside the .then of /info. If the component unmounts before the request finishes, the cleanup runs before t is set and the interval leaks. Use a cancelled flag or a ref.",
+    "Optional: the Inbox polling load() has no gen guard. A first-page response that is in flight from the previous filter could briefly overwrite convs after a filter switch. This was not seen in testing because the next poll corrects it."
+  ],
+  "critical_code_review_comments": [
+    "ChatWidget.jsx: Rules of Hooks violation (fixed)",
+    "ChatWidget.jsx: possible interval leak on unmount before /info resolves",
+    "Inbox.jsx: the 5s first-page poll is not guarded by gen.current"
+  ],
+  "updated_files": ["/app/frontend/src/components/ChatWidget.jsx", "/app/backend/tests/test_iter5_fixes.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% after fix (1 critical bug fixed)"},
+  "seed_data_creation": "None. The only side effect is that the summary of big-inbox conv 8e33d3ba-... was regenerated with force=true.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... pytest tests/test_iter5_fixes.py tests/test_iter4_multitenant.py -n 0. The admin Telegram webhook is correctly connected (bot Dev_nara_bot). Do not call Save & connect with another token. Admin bid da4f34c0-2f00-41e1-ab8c-86332eada73f.",
+  "rca of the issue": "ChatPanel used `if (missing) return (...)` before the second useEffect (scroll). On the first render missing=false and 2 effects ran. After /info returned 404, missing=true and only 1 effect ran, so React threw 'Rendered fewer hooks than expected'. Mitigation: moved the useEffect above the early return."
+}
