@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Copy, Send, Facebook, Globe, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { api, errMsg, BACKEND_URL } from "@/lib/auth";
+import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Section, Field } from "@/components/SettingsPanel";
 
-const embedCode = `<script src="${BACKEND_URL}/api/widget.js" async></script>`;
 
 const CopyBox = ({ value, testid }) => (
   <div className="flex gap-2 min-w-0">
@@ -26,6 +25,8 @@ const Head = ({ Icon, color, name }) => (
 );
 
 export default function ChannelsPanel() {
+  const { user } = useAuth();
+  const embedCode = `<script src="${BACKEND_URL}/api/widget.js" data-business="${user.business_id}" async></script>`;
   const [s, setS] = useState(null);
   const [st, setSt] = useState(null);
   const [busy, setBusy] = useState("");
@@ -67,7 +68,7 @@ export default function ChannelsPanel() {
 
         <Section title={<Head Icon={Facebook} color="#0084FF" name="Messenger" />} desc="In Meta for Developers: create an app → add Messenger → generate a Page access token → set the webhook below with your verify token, subscribe to 'messages'.">
           <Status ok={st?.messenger.configured} label="Configured" />
-          <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger`} testid="messenger-callback-url" /></Field>
+          <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger/${user.business_id}`} testid="messenger-callback-url" /></Field>
           <div className="grid sm:grid-cols-3 gap-4">
             <Field label="Page access token"><Input type="password" value={s.fb_page_token} onChange={set("fb_page_token")} data-testid="fb-page-token-input" /></Field>
             <Field label="App secret (App settings → Basic)"><Input type="password" value={s.fb_app_secret} onChange={set("fb_app_secret")} data-testid="fb-app-secret-input" /></Field>
@@ -82,7 +83,7 @@ export default function ChannelsPanel() {
           <Field label="Embed code — paste before </body> on your website"><CopyBox value={embedCode} testid="embed-code" /></Field>
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
             <span>Options: <code className="font-mono text-slate-300">data-color="#hex"</code> · <code className="font-mono text-slate-300">data-position="left"</code></span>
-            <a href="/embed" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300" data-testid="embed-preview-link">Preview chat window</a>
+            <a href={`/embed?b=${user.business_id}`} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300" data-testid="embed-preview-link">Preview chat window</a>
           </div>
         </Section>
       </div>

@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
 import Embed from "@/pages/Embed";
 import AuthCallback from "@/pages/AuthCallback";
@@ -22,6 +23,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route path="/embed" element={<Embed />} />
       <Route path="/dashboard/*" element={<Protected><Dashboard /></Protected>} />
     </Routes>

@@ -28,10 +28,13 @@ export default function Landing() {
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
           </div>
-          <Link to="/dashboard" data-testid="nav-dashboard-btn"
-            className="rounded-full bg-white text-slate-950 px-5 py-2 text-sm font-semibold hover:bg-emerald-400 transition-colors">
-            Dashboard
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/login" data-testid="nav-login-btn" className="px-4 py-2 text-sm font-semibold text-slate-300 hover:text-white">Log in</Link>
+            <Link to="/signup" data-testid="nav-signup-btn"
+              className="rounded-full bg-white text-slate-950 px-5 py-2 text-sm font-semibold hover:bg-emerald-400 transition-colors">
+              Start free
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -46,9 +49,9 @@ export default function Landing() {
               ReplyFlow's AI understands what your customers want and replies instantly on all your channels — in their language, in your tone. Jump in anytime with one-tap suggested replies.
             </p>
             <div className="mt-10 flex flex-wrap gap-4">
-              <Link to="/dashboard" data-testid="hero-get-started-btn"
+              <Link to="/signup" data-testid="hero-get-started-btn"
                 className="inline-flex items-center gap-2 rounded-full bg-emerald-500 text-slate-950 px-7 py-3.5 font-semibold shadow-[0_0_30px_rgba(16,185,129,0.35)] hover:bg-emerald-400 transition-colors">
-                Open dashboard <ArrowRight className="h-4 w-4" />
+                Create free account <ArrowRight className="h-4 w-4" />
               </Link>
               <a href="#how" data-testid="hero-how-btn" className="rounded-full border border-white/15 px-7 py-3.5 font-semibold hover:bg-white/5 transition-colors">How it works</a>
             </div>

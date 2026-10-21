@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X, ArrowUp } from "lucide-react";
 import { api, errMsg } from "@/lib/auth";
 
-const sessionId = () => {
-  let s = localStorage.getItem("rf_web_session");
+const sessionId = (bid) => {
+  const key = `rf_web_session_${bid}`;
+  let s = localStorage.getItem(key);
   if (!s) {
     s = `web-${crypto.randomUUID()}`;
-    localStorage.setItem("rf_web_session", s);
+    localStorage.setItem(key, s);
   }
   return s;
 };
@@ -17,18 +18,18 @@ export const Typing = () => (
   </div>
 );
 
-export const ChatPanel = ({ className = "", onClose, visitorName = "Website visitor" }) => {
+export const ChatPanel = ({ className = "", onClose, visitorName = "Website visitor", businessId = "default" }) => {
   const [info, setInfo] = useState({ business_name: "", greeting: "" });
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const end = useRef(null);
-  const sid = useRef(sessionId());
+  const sid = useRef(sessionId(businessId));
 
-  const load = () => api.get(`/public/chat/${sid.current}`).then((r) => setMsgs(r.data.messages));
+  const load = () => api.get(`/public/${businessId}/chat/${sid.current}`).then((r) => setMsgs(r.data.messages));
 
   useEffect(() => {
-    api.get("/public/info").then((r) => setInfo(r.data));
+    api.get(`/public/${businessId}/info`).then((r) => setInfo(r.data));
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
@@ -44,7 +45,7 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
     setMsgs((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", text: t }]);
     setBusy(true);
     try {
-      await api.post("/public/chat", { session_id: sid.current, text: t, name: visitorName });
+      await api.post(`/public/${businessId}/chat`, { session_id: sid.current, text: t, name: visitorName });
       await load();
     } catch (e) {
       const text = e?.response?.status === 429 ? errMsg(e) : "Sorry, something went wrong. Please try again.";

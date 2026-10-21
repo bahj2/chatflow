@@ -108,7 +108,7 @@ export default function SettingsPanel() {
             className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
         </Section>
 
-        <Section title="Team access" desc="Google accounts allowed to sign in to this dashboard with “Continue with Google”.">
+        <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own).">
           <div className="flex gap-2">
             <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@gmail.com" type="email" data-testid="allowed-email-input"
               onKeyDown={(e) => e.key === "Enter" && addEmail()} />

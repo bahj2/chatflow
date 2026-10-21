@@ -35,13 +35,14 @@ export const AuthProvider = ({ children }) => {
     setUser(data.user);
   };
   const login = async (email, password) => save((await api.post("/auth/login", { email, password })).data);
+  const register = async (body) => save((await api.post("/auth/register", body)).data);
   const loginGoogle = async (session_id) => save((await api.post("/auth/google", { session_id })).data);
   const failGoogle = () => setUser(false);
   const logout = () => {
     localStorage.removeItem("rf_token");
     setUser(false);
   };
-  return <AuthCtx.Provider value={{ user, login, loginGoogle, failGoogle, logout }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, setUser, login, register, loginGoogle, failGoogle, logout }}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

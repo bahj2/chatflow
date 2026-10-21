@@ -1,0 +1,28 @@
+{
+  "chat_100": {
+    "business_id": "4f0dbc25-7fad-40f4-b898-0ef8db1d9799",
+    "sent": 100,
+    "ai_replied": 100,
+    "wall_seconds": 6.7,
+    "p50": 5.5,
+    "p95": 6.6,
+    "slowest": 6.7,
+    "fastest": 3.1,
+    "errors": [],
+    "inbox_total": 100,
+    "ai_replies_in_db": 100
+  },
+  "big_inbox": {
+    "business_id": "9349429e-2051-4071-858d-c70a47d074b8",
+    "seeded": 3000,
+    "total_reported": 3000,
+    "paged_through": 3000,
+    "pages": 60,
+    "first_page_ms": 7,
+    "avg_page_ms": 47,
+    "search_ms": 60,
+    "search_hits": 241,
+    "telegram_filter_ms": 48,
+    "telegram_total": 1000
+  }
+}

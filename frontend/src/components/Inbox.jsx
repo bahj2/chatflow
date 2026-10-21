@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Sparkles, ArrowUp, Bot, User, Headphones, ArrowLeft, Loader2, Zap } from "lucide-react";
 import { SummaryPanel, SummaryStrip } from "@/components/CustomerSummary";
 import { toast } from "sonner";
@@ -9,11 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 
 const FILTERS = ["all", "web", "telegram", "messenger"];
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
+const when = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString() ? time(iso) : d.toLocaleDateString([], { day: "numeric", month: "short" });
+};
 
-const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ }) => (
+const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ, total, hasMore, onMore, loadingMore }) => (
   <div className="flex flex-col h-full border-r border-white/5 bg-[#0D121C]">
     <div className="p-4 space-y-3 border-b border-white/5">
-      <h1 className="font-display text-xl font-bold">Inbox</h1>
+      <h1 className="font-display text-xl font-bold flex items-baseline gap-2">Inbox <span className="text-xs font-mono text-slate-500" data-testid="inbox-total">{total.toLocaleString()} chats</span></h1>
       <div className="relative">
         <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-500" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" data-testid="inbox-search-input"
@@ -26,14 +31,15 @@ const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ }) => (
         ))}
       </div>
     </div>
-    <div className="flex-1 overflow-y-auto" data-testid="conversation-list">
+    <div className="flex-1 overflow-y-auto" data-testid="conversation-list"
+      onScroll={(e) => { const el = e.currentTarget; if (hasMore && !loadingMore && el.scrollTop + el.clientHeight > el.scrollHeight - 300) onMore(); }}>
       {convs.length === 0 && <p className="p-6 text-sm text-slate-500" data-testid="inbox-empty">No conversations yet. Try the chat on your website!</p>}
       {convs.map((c) => (
         <button key={c.id} onClick={() => onPick(c)} data-testid={`conversation-item-${c.id}`}
           className={`w-full text-left px-4 py-3.5 border-b border-white/5 transition-colors ${active?.id === c.id ? "bg-emerald-500/[0.07] border-l-2 border-l-emerald-400" : "hover:bg-white/[0.03]"}`}>
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-sm truncate">{c.name}</span>
-            <span className="text-[11px] text-slate-500 shrink-0">{time(c.updated_at)}</span>
+            <span className="text-[11px] text-slate-500 shrink-0">{when(c.updated_at)}</span>
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <ChannelBadge channel={c.channel} compact />
@@ -43,6 +49,11 @@ const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ }) => (
           </div>
         </button>
       ))}
+      {hasMore && (
+        <button onClick={onMore} disabled={loadingMore} data-testid="load-more-btn" className="w-full py-4 text-xs text-slate-400 hover:text-white flex items-center justify-center gap-2">
+          {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Load older chats
+        </button>
+      )}
     </div>
   </div>
 );
@@ -196,21 +207,52 @@ export default function Inbox() {
   const [active, setActive] = useState(null);
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
+  const [dq, setDq] = useState("");
   const [quick, setQuick] = useState([]);
+  const [older, setOlder] = useState([]);
+  const [olderMore, setOlderMore] = useState(null);
+  const [firstMore, setFirstMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => { const t = setTimeout(() => setDq(q), 300); return () => clearTimeout(t); }, [q]);
+  const params = { channel: filter, q: dq || undefined };
+  const merged = useMemo(() => {
+    const seen = new Set();
+    return [...convs, ...older].filter((c) => !seen.has(c.id) && seen.add(c.id));
+  }, [convs, older]);
+  const hasMore = olderMore === null ? firstMore : olderMore;
+
+  const loadMore = async () => {
+    const last = merged[merged.length - 1];
+    if (!last) return;
+    setLoadingMore(true);
+    try {
+      const { data } = await api.get("/conversations", { params: { ...params, before: last.updated_at } });
+      setOlder((o) => [...o, ...data.items]);
+      setOlderMore(data.has_more);
+    } finally { setLoadingMore(false); }
+  };
 
   useEffect(() => { api.get("/settings").then((r) => setQuick((r.data.quick_replies || []).filter((x) => x.label && x.text))); }, []);
 
   useEffect(() => {
-    const load = () => api.get("/conversations", { params: { channel: filter, q: q || undefined } }).then((r) => setConvs(r.data));
+    setOlder([]);
+    setOlderMore(null);
+    const load = () => api.get("/conversations", { params }).then((r) => {
+      setConvs(r.data.items);
+      setFirstMore(r.data.has_more);
+      setTotal(r.data.total);
+    });
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
-  }, [filter, q]);
+  }, [filter, dq]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="h-full grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] overflow-hidden">
       <div className={`${active ? "hidden md:block" : ""} min-h-0 min-w-0 overflow-hidden`}>
-        <ConvList convs={convs} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} />
+        <ConvList convs={merged} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} total={total} hasMore={hasMore} onMore={loadMore} loadingMore={loadingMore} />
       </div>
       <div className={`${active ? "" : "hidden md:grid place-items-center"} min-h-0 min-w-0 h-full`}>
         {active ? <ChatView conv={active} onBack={() => setActive(null)} onChange={setActive} quick={quick} />
