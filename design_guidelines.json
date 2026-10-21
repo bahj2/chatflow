@@ -1,0 +1,104 @@
+{
+  "project_name": "EchoFlow AI - Instant Omni-channel AI Auto-Reply & Live Support Hub",
+  "app_type": "hybrid_fullstack",
+  "theme": "Dual-Mode / Modern Tactical Obsidian & Light Studio",
+  "emotional_tone": "High-Efficiency, High-Trust, Seamless & Intelligent",
+  "archetype": "Swiss & High-Contrast Precision mixed with Tactical Dark Mode",
+  "typography": {
+    "headline_font": "Outfit, Cabinet Grotesk, sans-serif",
+    "body_font": "Inter, Plus Jakarta Sans, sans-serif",
+    "mono_font": "JetBrains Mono, Source Code Pro, monospace",
+    "hierarchy": {
+      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1]",
+      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3_card": "text-xl sm:text-2xl font-semibold tracking-normal",
+      "h4_widget": "text-lg sm:text-xl font-medium",
+      "body": "text-sm sm:text-base leading-relaxed text-slate-300 dark:text-slate-300",
+      "caption": "text-xs font-mono uppercase tracking-widest text-emerald-400"
+    }
+  },
+  "colors": {
+    "dark_theme": {
+      "bg_primary": "#0B0F17",
+      "bg_secondary": "#111827",
+      "bg_card": "#1E293B",
+      "border": "rgba(255, 255, 255, 0.08)",
+      "text_primary": "#F8FAFC",
+      "text_secondary": "#94A3B8",
+      "accent_emerald": "#10B981",
+      "accent_indigo": "#6366F1",
+      "accent_amber": "#F59E0B",
+      "channel_telegram": "#229ED9",
+      "channel_messenger": "#0084FF",
+      "channel_web": "#10B981"
+    },
+    "light_theme": {
+      "bg_primary": "#F8FAFC",
+      "bg_secondary": "#FFFFFF",
+      "bg_card": "#FFFFFF",
+      "border": "rgba(0, 0, 0, 0.08)",
+      "text_primary": "#0F172A",
+      "text_secondary": "#475569",
+      "accent_emerald": "#059669",
+      "accent_indigo": "#4F46E5",
+      "accent_amber": "#D97706"
+    },
+    "banned_colors": [
+      "#7351B7",
+      "#1B93A4"
+    ]
+  },
+  "layout_strategies": {
+    "marketing_landing": {
+      "nav": "Sticky glassmorphic navbar with logo, nav links (Features, How it Works, AI Models, Pricing), active AI status badge, and 'Go to Dashboard' / 'Login' CTA",
+      "hero": "Asymmetric bento grid with high-impact value prop on left, live interactive AI Widget simulation on right (users can chat with live AI immediately)",
+      "features": "4-column grid highlighting Telegram Bot integration, Facebook Messenger automation, Web Live Chat widget, and Claude 3.5 Sonnet / Gemini 1.5 Flash model switching",
+      "interactive_widget_preview": "Floating bottom-right chat widget toggle or hero-embedded chat interface with real-time AI auto-reply simulations",
+      "cta_footer": "Massive typography footer with quick setup button and instant channel connection links"
+    },
+    "admin_dashboard": {
+      "structure": "3-Column Tactical Inbox Layout",
+      "col1_inbox_list": "Width: 320px-360px. List of active conversations with channel badges (Telegram, Facebook Messenger, Website), unread counts, sentiment badges (Hot Lead, Support, FAQ), search bar, and filter tabs (All, Telegram, Messenger, Web, AI Active, Needs Manual)",
+      "col2_chat_view": "Flex-1 main conversation panel. Header with contact info, channel badge, toggle AI Auto-Reply (ON/OFF), and handoff button. Message feed with clear distinction between User message, AI Auto-Reply, and Manual Agent Reply. Bottom bar with input area + 'AI Suggested Reply' chip triggers + Send button",
+      "col3_customer_context": "Width: 300px. Contact profile, channel metadata, conversation summary, key entity extraction (intent, budget, query type), and quick AI notes"
+    },
+    "ai_settings_page": {
+      "sections": [
+        "Business Information (Business Name, Industry, Core Offerings, Tone/Persona Selector: Professional, Friendly, Direct, Witty)",
+        "FAQ Knowledge Matrix (Add/Edit FAQ Q&A pairs with instant AI retrieval tester)",
+        "AI Model & Intelligence (Select model: Claude 3.5 Sonnet, Gemini 1.5 Flash, GPT-4o; Set confidence score threshold for auto-reply vs manual handoff)",
+        "Global Master Toggles (Master AI Auto-Reply Enable, Out-of-hours auto-reply, Human handoff notification threshold)"
+      ]
+    },
+    "channels_page": {
+      "telegram_card": "Bot Token input, Webhook status indicator (Connected/Disconnected), Copy webhook URL button, Test bot message trigger",
+      "messenger_card": "Facebook Page Access Token input, Verify Token field, Webhook setup guide, Copy Callback URL",
+      "web_chat_card": "Customizable widget colors/greeting message, one-click HTML `<script>` embed code copy block, preview button"
+    }
+  },
+  "image_urls": {
+    "team_support_avatar": "https://images.unsplash.com/photo-1766066014237-00645c74e9c6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBidXNpbmVzcyUyMHRlYW0lMjBzdXBwb3J0JTIwd29ya3NwYWNlfGVufDB8fHx8MTc5MjU3ODIyMnww&ixlib=rb-4.1.0&q=85",
+    "agent_workspace": "https://images.unsplash.com/photo-1712159018726-4564d92f3ec2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBidXNpbmVzcyUyMHRlYW0lMjBzdXBwb3J0JTIwd29ya3NwYWNlfGVufDB8fHx8MTc5MjU3ODIyMnww&ixlib=rb-4.1.0&q=85",
+    "office_collaboration": "https://images.pexels.com/photos/7658366/pexels-photo-7658366.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+  },
+  "component_guidelines": {
+    "buttons": "Use pill or tight 8px rounded buttons with explicit hover text contrast. High-priority CTAs use glowing shadow effects `shadow-[0_0_20px_rgba(16,185,129,0.3)]`.",
+    "badges": "Use distinct channel visual cues: Telegram (Cyan/Blue #229ED9), Messenger (Royal Blue #0084FF), Website Live Chat (Emerald #10B981).",
+    "inputs": "Shadcn `Input` and `Textarea` styled with crisp focus rings (`focus:ring-1 focus:ring-emerald-500`) and clear text contrast.",
+    "chat_bubbles": "User bubbles: Slate dark background with border. AI bubbles: Emerald-tinted border with 'AI Auto-Replied' pill badge. Manual agent bubbles: Indigo-tinted border.",
+    "toasts": "Use `sonner` for toast notifications when saving tokens, toggling AI settings, or copying embed scripts."
+  },
+  "testing_and_accessibility": {
+    "data_testid_rules": "All interactive elements, channel toggles, message inputs, AI suggested reply buttons, model selectors, and search bars MUST include explicit kebab-case `data-testid` attributes (e.g. `data-testid=\"ai-toggle-switch\"`, `data-testid=\"ai-suggested-reply-btn\"`, `data-testid=\"send-message-btn\"`).",
+    "contrast_compliance": "Minimum 4.5:1 contrast ratio on all body texts. No transparent backgrounds behind text or dropdown menus."
+  },
+  "instructions_to_main_agent": [
+    "Ensure the website landing page contains a functional live floating AI Chat Widget so visitors can test the AI auto-reply capabilities immediately.",
+    "Build the 3-column Unified Inbox in the admin dashboard allowing seamless switching between Telegram, Messenger, and Web conversations.",
+    "Provide an AI toggle per conversation so human agents can take over manual reply anytime or switch AI back on.",
+    "Include an 'AI Suggested Reply' button in the chat input toolbar that populates suggested text for instant 1-click sending.",
+    "Create the AI Settings page with customizable Business Profile, FAQs, Tone selector (Friendly/Professional/Direct), and AI model selector (Claude 3.5 Sonnet / Gemini 1.5 Flash / GPT-4o).",
+    "Create the Channels setup tab with copyable webhook URLs, token inputs, and web embed script snippet generator.",
+    "Strictly follow all data-testid conventions across buttons, inputs, tabs, and toggles."
+  ]
+}
