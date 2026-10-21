@@ -286,6 +286,9 @@ async def read_settings(user=Depends(current_user)):
 
 @api.put("/settings")
 async def write_settings(body: Settings, user=Depends(current_user)):
+    body.voxcpm_url = body.voxcpm_url.strip().rstrip("/")
+    if body.voxcpm_url and not body.voxcpm_url.startswith("https://"):
+        raise HTTPException(400, "VoxCPM2 server URL must start with https://")
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
@@ -827,12 +830,48 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=
 async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     s = await get_settings(user["business_id"])
     s = s.model_copy(update={k: v for k, v in {"voice": body.voice, "khmer_voice": body.khmer_voice}.items() if v})
+    text, audio, engine, vox_error = body.text[:500], None, None, None
+    if s.voxcpm_url and (s.voxcpm_for == "all" or M.KHMER.search(text)):
+        try:
+            ref = (await M.load_media(db, s.seller_voice_media_id))[0] if s.seller_voice_media_id else None
+            audio, engine = await M.voxcpm_tts(s, M.EMOJI.sub("", text), ref), "voxcpm2"
+        except Exception as e:
+            vox_error = vox_msg(e)
     try:
-        audio, engine = await M.speak(db, s, body.text[:500])
+        if audio is None:
+            audio, engine = await M.speak(db, s.model_copy(update={"voxcpm_url": ""}), text)
     except Exception as e:
         raise HTTPException(502, f"Voice generation failed: {e}")
     doc = await M.save_media(db, user["business_id"], audio, "audio/mpeg", "voice_test")
-    return {"media_id": doc["id"], "engine": engine}
+    return {"media_id": doc["id"], "engine": engine, "vox_error": vox_error}
+
+
+def vox_msg(e: Exception) -> str:
+    if isinstance(e, httpx.HTTPStatusError):
+        return "Wrong API key" if e.response.status_code == 401 else f"Server answered {e.response.status_code}"
+    if isinstance(e, httpx.TimeoutException):
+        return "Server did not answer in time (Modal may still be waking up — try again in a minute)"
+    if isinstance(e, httpx.ConnectError):
+        return "Cannot reach the server (is the Colab tab still running? the link changes on every restart)"
+    return str(e)[:200] or e.__class__.__name__
+
+
+class VoxCheckIn(BaseModel):
+    url: str
+    key: str = ""
+
+
+@api.post("/voice/voxcpm-check")
+async def voxcpm_check(body: VoxCheckIn, user=Depends(current_user)):
+    if not body.url.startswith("https://"):
+        return {"ok": False, "error": "The address must start with https://"}
+    try:
+        async with httpx.AsyncClient(timeout=30) as h:
+            r = await h.get(f"{body.url.rstrip('/')}/health", headers={"Authorization": f"Bearer {body.key}"} if body.key else {})
+        r.raise_for_status()
+        return {"ok": True, **r.json()}
+    except Exception as e:
+        return {"ok": False, "error": vox_msg(e)}
 
 
 @api.get("/stats")
