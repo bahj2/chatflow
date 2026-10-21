@@ -28,7 +28,7 @@ export default function ChannelsPanel() {
   const [st, setSt] = useState(null);
   const [busy, setBusy] = useState("");
   const loadStatus = () => api.get("/channels/status").then((r) => setSt(r.data));
-  useEffect(() => { api.get("/settings").then((r) => setS(r.data)); loadStatus(); }, []);
+  useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); loadStatus(); }, []);
   if (!s) return <div className="p-8 text-slate-500">Loading…</div>;
 
   const set = (k) => (e) => setS({ ...s, [k]: e.target.value });

@@ -1,0 +1,48 @@
+{
+  "summary": "First full test run of ReplyFlow (landing + website AI chat, admin login, inbox, AI suggestions, manual reply, per-chat AI toggle, AI Settings, Channels, Messenger/Telegram webhooks, mobile). Backend: 20/20 pytest pass, covering both Claude and Gemini. Frontend: all requested flows work at 1920px. One real UI bug: the dashboard inbox overflows sideways at 390px mobile width. There is also a small race on the Channels/Settings forms. Settings were reset to defaults at the end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/webhooks/messenger", "issue": "No X-Hub-Signature-256 (app secret) check. Anyone can send fake messages into the inbox and trigger paid LLM calls."},
+      {"endpoint": "POST /api/webhooks/telegram/{secret}", "issue": "The 'secret' is the bot id (the public part of the token, also visible in the bot's t.me link). Use setWebhook secret_token and check the X-Telegram-Bot-Api-Secret-Token header instead."},
+      {"endpoint": "POST /api/public/chat", "issue": "No rate limit and no max text length on a public endpoint that calls the LLM, so the LLM key can be abused."},
+      {"endpoint": "POST /api/channels/telegram/connect", "issue": "When Telegram rejects a token, the bad token stays saved. channels/status then reports 'configured' and calls the Telegram API on every load."},
+      {"endpoint": "get_or_create_conv", "issue": "Race: two webhook events arriving at once for a new sender can hit DuplicateKeyError (unique index) in the background task, and that message is dropped."},
+      {"endpoint": "GET /api/conversations?q=", "issue": "Search only matches name and last_message (usually the AI reply), so searching for a customer's own words often returns nothing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Inbox (mobile 390px)", "issue": "Horizontal overflow: document scrollWidth is 963px at a 390px viewport. Search input, timestamps and unread badges are pushed off-screen. Cause: the root grid in Inbox.jsx (`grid md:grid-cols-[340px_1fr]`) has no explicit mobile column or min-w-0, so the truncating last_message text sets the column width. Fix: add `grid-cols-1` and `min-w-0` (or `overflow-hidden`) on the grid and on the list wrapper.", "selector": "[data-testid=conversation-list]", "priority": "HIGH"},
+      {"component": "ChannelsPanel / SettingsPanel", "issue": "Race: in dev StrictMode the effect fires GET /settings twice. If the user types before the second response arrives, the input is overwritten. Seen reliably with Playwright: the telegram token was wiped and the toast said 'Save your Telegram bot token first'. Guard the effect (abort or ignore stale responses).", "selector": "[data-testid=telegram-token-input]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Website chat send", "issue": "ChatPanel.send has no catch. If the API fails, the optimistic message stays with no error shown and there is an unhandled promise rejection. Inbox toggleAI also has no error handling.", "affected_selectors": ["chat-send-btn", "ai-toggle-switch"]}
+    ],
+    "design_issues": [
+      {"screen": "Inbox desktop", "issues": ["The right column uses `md:grid place-items-center`, so ChatView shrinks to its content width instead of filling the column (visible empty gutter). Apply place-items-center only to the empty-state placeholder."]},
+      {"screen": "Landing", "issues": ["When the floating widget is open on desktop, it overlaps the hero demo chat's send button (minor). AI replies sometimes include emojis."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_replyflow_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix the mobile inbox horizontal overflow (Inbox.jsx grid min-w-0 / grid-cols-1)",
+    "Add Messenger X-Hub-Signature-256 verification and a Telegram secret_token header check",
+    "Rate-limit /api/public/chat and cap message length",
+    "Do not keep a Telegram token that Telegram rejected (or refresh the status after an error)",
+    "Add a catch/error toast to ChatPanel.send and Inbox toggleAI",
+    "Optional: let search match message bodies; stop ChatView shrinking on desktop"
+  ],
+  "critical_code_review_comments": [
+    "Webhook endpoints are unauthenticated in practice (see backend minor issues)",
+    "Bearer-token auth in localStorage, not httpOnly cookies (by design); bcrypt $2b$ hashing, brute-force lockout (429 on the 6th try) and admin re-seed when the password changes are all implemented",
+    "Errors in handle_incoming background tasks are only logged; there is no retry"
+  ],
+  "updated_files": ["/app/backend/tests/test_replyflow_api.py"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "test_credentials": "admin@replyflow.com / admin123 (works)",
+  "seed_data_creation": "Created TEST_ web conversations and one messenger conversation (PSID TEST...). Settings were reset to defaults (My Business, claude, empty tokens).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest /app/backend/tests/test_replyflow_api.py (it restores settings via a fixture). In Playwright, wait for networkidle and about 1.5s before filling Channels/Settings inputs (StrictMode double fetch). Inbox search does not match user message text. Recheck the mobile 390px inbox scrollWidth after the fix."
+}

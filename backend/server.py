@@ -19,6 +19,8 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Backgro
 from fastapi.responses import PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import DuplicateKeyError
+import hashlib
 from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
@@ -71,8 +73,8 @@ class Settings(BaseModel):
 
 
 class PublicChatIn(BaseModel):
-    session_id: str
-    text: str
+    session_id: str = Field(max_length=100)
+    text: str = Field(max_length=2000)
     name: Optional[str] = None
 
 
@@ -208,7 +210,10 @@ async def get_or_create_conv(channel: str, external_id: str, name: str) -> dict:
         return conv
     conv = {"id": str(uuid.uuid4()), "channel": channel, "external_id": external_id, "name": name or "Guest",
             "ai_enabled": True, "unread": 0, "last_message": "", "created_at": now_iso(), "updated_at": now_iso()}
-    await db.conversations.insert_one(dict(conv))
+    try:
+        await db.conversations.insert_one(dict(conv))
+    except DuplicateKeyError:
+        return await db.conversations.find_one({"channel": channel, "external_id": external_id}, {"_id": 0})
     return conv
 
 
@@ -274,10 +279,14 @@ async def public_history(session_id: str):
 
 
 # ---------- Webhooks ----------
+def tg_secret(token: str) -> str:
+    return hashlib.sha256(f"{JWT_SECRET}:{token}".encode()).hexdigest()
+
+
 @api.post("/webhooks/telegram/{secret}")
 async def telegram_webhook(secret: str, request: Request, bg: BackgroundTasks):
     s = await get_settings()
-    if not s.telegram_token or secret != s.telegram_token.split(":")[0]:
+    if not s.telegram_token or secret != s.telegram_token.split(":")[0] or request.headers.get("X-Telegram-Bot-Api-Secret-Token") != tg_secret(s.telegram_token):
         raise HTTPException(403, "Bad secret")
     data = await request.json()
     m = data.get("message") or {}
@@ -316,7 +325,8 @@ async def list_convs(channel: Optional[str] = None, q: Optional[str] = None, use
     if channel and channel != "all":
         flt["channel"] = channel
     if q:
-        flt["$or"] = [{"name": {"$regex": re.escape(q), "$options": "i"}}, {"last_message": {"$regex": re.escape(q), "$options": "i"}}]
+        hits = await db.messages.distinct("conversation_id", {"text": {"$regex": re.escape(q), "$options": "i"}})
+        flt["$or"] = [{"id": {"$in": hits}}, {"name": {"$regex": re.escape(q), "$options": "i"}}, {"last_message": {"$regex": re.escape(q), "$options": "i"}}]
     return await db.conversations.find(flt, {"_id": 0}).sort("updated_at", -1).to_list(300)
 
 
@@ -397,8 +407,9 @@ async def telegram_connect(body: TelegramConnectIn, user=Depends(current_user)):
     async with httpx.AsyncClient(timeout=20) as h:
         me_r = (await h.get(f"https://api.telegram.org/bot{s.telegram_token}/getMe")).json()
         if not me_r.get("ok"):
+            await db.settings.update_one({"key": "main"}, {"$set": {"telegram_token": ""}})
             raise HTTPException(400, f"Telegram rejected the token: {me_r.get('description', 'invalid token')}")
-        r = (await h.post(f"https://api.telegram.org/bot{s.telegram_token}/setWebhook", json={"url": url})).json()
+        r = (await h.post(f"https://api.telegram.org/bot{s.telegram_token}/setWebhook", json={"url": url, "secret_token": tg_secret(s.telegram_token)})).json()
     if not r.get("ok"):
         raise HTTPException(400, f"Webhook failed: {r.get('description')}")
     return {"ok": True, "bot": me_r["result"].get("username"), "webhook": url}

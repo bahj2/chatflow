@@ -92,14 +92,14 @@ const Composer = ({ conv, onSent }) => {
 
   return (
     <div className="border-t border-white/5 p-4 space-y-3 bg-[#0D121C]">
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-start">
         <button onClick={suggest} disabled={loading} data-testid="ai-suggest-btn"
           className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30 px-3 py-1.5 text-xs font-semibold hover:bg-amber-400/20 transition-colors disabled:opacity-60">
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Suggest replies
         </button>
         {sugs.map((s, i) => (
           <button key={i} onClick={() => setText(s)} onDoubleClick={() => send(s)} data-testid={`ai-suggestion-${i}`} title="Click to edit · double-click to send"
-            className="text-left rounded-xl border border-white/10 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 hover:border-emerald-500/50 transition-colors max-w-xs line-clamp-2">{s}</button>
+            className="text-left rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs leading-snug text-slate-200 hover:border-emerald-500/50 transition-colors max-w-xs">{s}</button>
         ))}
       </div>
       <div className="flex gap-2 items-end">
@@ -129,9 +129,11 @@ const ChatView = ({ conv, onBack, onChange }) => {
   useEffect(() => { const el = end.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs.length]);
 
   const toggleAI = async (v) => {
-    const { data } = await api.patch(`/conversations/${conv.id}`, { ai_enabled: v });
-    onChange(data);
-    toast.success(v ? "AI auto-reply on for this chat" : "You took over this chat");
+    try {
+      const { data } = await api.patch(`/conversations/${conv.id}`, { ai_enabled: v });
+      onChange(data);
+      toast.success(v ? "AI auto-reply on for this chat" : "You took over this chat");
+    } catch (e) { toast.error(errMsg(e)); }
   };
 
   return (
@@ -170,11 +172,11 @@ export default function Inbox() {
   }, [filter, q]);
 
   return (
-    <div className="h-full grid md:grid-cols-[340px_1fr]">
-      <div className={`${active ? "hidden md:block" : ""} min-h-0`}>
+    <div className="h-full grid grid-cols-1 md:grid-cols-[340px_minmax(0,1fr)] overflow-hidden">
+      <div className={`${active ? "hidden md:block" : ""} min-h-0 min-w-0 overflow-hidden`}>
         <ConvList convs={convs} active={active} onPick={setActive} filter={filter} setFilter={setFilter} q={q} setQ={setQ} />
       </div>
-      <div className={`${active ? "" : "hidden md:grid"} min-h-0 place-items-center`}>
+      <div className={`${active ? "" : "hidden md:grid place-items-center"} min-h-0 min-w-0 h-full`}>
         {active ? <ChatView conv={active} onBack={() => setActive(null)} onChange={setActive} />
           : <p className="text-slate-500 text-sm" data-testid="no-chat-selected">Select a conversation to view it</p>}
       </div>

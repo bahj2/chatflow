@@ -50,7 +50,7 @@ const Tester = () => {
 export default function SettingsPanel() {
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { api.get("/settings").then((r) => setS(r.data)); }, []);
+  useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); }, []);
   if (!s) return <div className="p-8 text-slate-500">Loading…</div>;
 
   const set = (k) => (v) => setS({ ...s, [k]: v?.target ? v.target.value : v });

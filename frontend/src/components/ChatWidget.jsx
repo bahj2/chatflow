@@ -46,6 +46,8 @@ export const ChatPanel = ({ className = "", onClose }) => {
     try {
       await api.post("/public/chat", { session_id: sid.current, text: t });
       await load();
+    } catch {
+      setMsgs((m) => [...m, { id: `err-${Date.now()}`, role: "ai", text: "Sorry, something went wrong. Please try again." }]);
     } finally {
       setBusy(false);
     }
