@@ -294,6 +294,8 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     if body.voxcpm_url and not await public_https(body.voxcpm_url):
         raise HTTPException(400, "VoxCPM2 server URL must be a public internet address")
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
+    body.seller_voice_media_id = (await get_settings(user["business_id"])).seller_voice_media_id  # only /settings/seller-voice may change it
+    body.seller_voice_text = body.seller_voice_text[:500]
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
     return body.model_dump()
@@ -591,7 +593,9 @@ async def public_voice(bid: str, request: Request, bg: BackgroundTasks, session_
     if not data or len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Voice message must be under 10 MB")
     bg.add_task(handle_incoming, bid, "web", session_id, name[:80], "", audio=data)  # voice replies can take > 60 s; widget polls
-    return {"accepted": True}
+    s = await get_settings(bid)
+    conv = await db.conversations.find_one({"business_id": bid, "channel": "web", "external_id": session_id}, {"_id": 0, "ai_enabled": 1})
+    return {"accepted": True, "ai_reply": bool(s.auto_reply and (conv or {}).get("ai_enabled", True))}
 
 
 @api.get("/public/{bid}/chat/{session_id}")
@@ -826,7 +830,7 @@ async def delete_product(pid: str, user=Depends(current_user)):
 
 
 @api.post("/settings/seller-voice")
-async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=Depends(current_user)):
+async def seller_voice(file: UploadFile = File(...), text: str = Form("", max_length=500), user=Depends(current_user)):
     data = await file.read()
     if not data or len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Voice sample must be under 10 MB")
@@ -837,8 +841,14 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=
         raise HTTPException(400, "Could not read this audio file")
     if not 5 <= secs <= 30.5:
         raise HTTPException(400, f"The sample is {secs:.0f} seconds. Please use 5–30 seconds of clear speech.")
+    try:
+        text = text.strip() or await M.transcribe(await M.to_mp3(data))
+    except Exception as e:
+        logger.warning("seller voice transcription failed: %s", e)
+        raise HTTPException(424, "Could not write down the words in this sample. Please try again.")
+    if not text.strip():
+        raise HTTPException(400, "No speech found in this sample. Please record the seller speaking clearly.")
     doc = await M.save_media(db, user["business_id"], wav, "audio/wav", "seller_voice")
-    text = text.strip() or await M.transcribe(await M.to_mp3(data))
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"seller_voice_media_id": doc["id"], "seller_voice_text": text}})
     return {"media_id": doc["id"], "text": text, "seconds": round(secs, 1)}
 
@@ -859,9 +869,9 @@ async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     except Exception as e:
         logger.warning("voice test failed: %s", e)
         if M.KHMER.search(body.text):
-            raise HTTPException(502, "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. "
+            raise HTTPException(424, "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. "
                                      "Customers get the reply as text until it is back. Try again in a minute.")
-        raise HTTPException(502, "Voice generation failed. Please try again.")
+        raise HTTPException(424, "Voice generation failed. Please try again.")
     doc = await M.save_media(db, user["business_id"], audio, "audio/mpeg", "voice_test")
     return {"media_id": doc["id"], "engine": engine}
 

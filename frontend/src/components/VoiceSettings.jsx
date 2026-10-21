@@ -14,6 +14,8 @@ const VOICES = [["nova", "Nova — energetic"], ["shimmer", "Shimmer — bright"
 const ENGINES = { "voxcpm2-hf": "VoxCPM2 · default voice", "voxcpm2-hf-clone": "VoxCPM2 · seller voice clone", openai: "OpenAI" };
 const MAX_SECONDS = 30;
 
+const BUSY_KM = "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. Customers get the reply as text until it is back. Try again in a minute.";
+
 const Preview = ({ text, label, testid, s }) => {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
@@ -21,7 +23,9 @@ const Preview = ({ text, label, testid, s }) => {
   const run = async () => {
     setBusy(true);
     setErr("");
-    try { setRes((await api.post("/voice/test", { text, voice: s.voice })).data); } catch (e) { setRes(null); setErr(errMsg(e)); toast.error(errMsg(e)); } finally { setBusy(false); }
+    try { setRes((await api.post("/voice/test", { text, voice: s.voice })).data); }
+    catch (e) { const m = e?.response?.data?.detail ? errMsg(e) : /[\u1780-\u17FF]/.test(text) ? BUSY_KM : "Voice preview failed. Please try again."; setRes(null); setErr(m); toast.error(m); }
+    finally { setBusy(false); }
   };
   return (
     <div className="flex flex-wrap items-center gap-3">

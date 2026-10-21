@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 11: tested the seller voice clone (upload/record/remove) end to end, the VoxCPM2 HF engines, multi-tenant media isolation and async widget voice. The reported bug is fixed: the seller-voice block is visible on desktop 1920 and mobile 390 with no overflow. Upload, recording, auto-stop at 30 s, transcript editing and saving, removal, the clone engine and the widget's async voice all work. Two real issues remain: (1) any backend 502 from /api/voice/test reaches the browser as Cloudflare's HTML error page, so the UI shows 'The origin web server returned an invalid or incomplete response to Cloudflare...' instead of the friendly busy message; (2) PUT /api/settings accepts another business's seller_voice_media_id (cross-tenant voice-sample use). Also: Gemini makes up a Khmer transcript for non-speech audio.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/voice/test", "issue": "When HF is busy, the backend correctly returns a JSON 502 (seen in the backend log), but at the public URL Cloudflare/ingress replaces the body with its HTML error page (curl: 502 text/html). The frontend errMsg shows the Cloudflare text. Seen twice in the UI: after 50.8 s (timeout) and after 0.9 s (HF returned 503 immediately). The friendly 'busy or down' message never reaches users. Fix: return a non-502 status (e.g. 503/424/409, or 200 with {error}) and confirm it passes the proxy.", "priority": "HIGH"},
+      {"endpoint": "PUT /api/settings", "issue": "The Settings model includes seller_voice_media_id and it is saved as-is. Business B can set A's media id (test_cross_tenant_media_id_injection: accepted, status 200). M.speak -> load_media does not check business_id, so B's Khmer replies would clone A's voice. Fix: ignore or strip seller_voice_media_id in PUT /settings (keep the stored value; edit only seller_voice_text), and/or check doc.business_id in speak().", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/settings/seller-voice", "issue": "Auto-transcription invents speech: a 30 s Chromium fake-mic beep was transcribed by Gemini as a long, invented Khmer paragraph, which then becomes the VoxCPM2 prompt_text. Consider a speech/VAD or energy check, or Whisper no_speech_prob, and reject samples that contain no speech."},
+      {"endpoint": "POST /api/settings/seller-voice", "issue": "The media is saved before transcription. If both Gemini and Whisper fail, this returns 500 and leaves an orphan media doc. The 'text' form field has no max_length."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Test Khmer voice / Test seller voice when HF is busy", "issue": "The amber error shows Cloudflare's raw text instead of the friendly VoxCPM2 busy message (root cause is backend status 502, see backend critical). Also consider a client-side fallback: if the response is not JSON, show the friendly text.", "affected_selectors": ["[data-testid='khmer-preview-btn-error']", "[data-testid='seller-voice-preview-btn-error']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter11_seller_voice.py", "/app/test_reports/pytest/pytest_iter11.xml"],
+  "action_items": [
+    "Change the /api/voice/test failure status from 502 to e.g. 503 or 424 (or 200 with an error field) so Cloudflare does not replace the JSON body; then retest via the public URL",
+    "Stop PUT /api/settings from setting seller_voice_media_id (only the seller-voice endpoints may change it); check business_id when loading the seller sample in M.speak",
+    "Reject seller samples with no speech (Gemini invents Khmer transcripts for tones)",
+    "Transcribe before save_media (or handle the transcription exception) and add max_length to the text field"
+  ],
+  "critical_code_review_comments": [
+    "server.py write_settings saves client-supplied seller_voice_media_id (cross-tenant + stale-overwrite risk: an old tab's Save can revert a newer sample id)",
+    "media.load_media has no business_id scoping; only get_media checks it",
+    "The JWT is passed in the query string (?auth=token) for seller-voice playback, so it ends up in proxy/access logs; prefer a short-lived signed media token",
+    "ChatWidget waitForReply: if auto-reply is off or the AI reply fails, the typing indicator spins for the full 90 s with no message",
+    "server.py is 1228 lines and should be split into modules"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter11_seller_voice.py"],
+  "success_rate": {"backend": "91% (10/11; the failure is the cross-tenant media-id injection)", "frontend": "~85% (all flows work; the friendly busy message is broken by the proxy)"},
+  "observed_timings": {
+    "seller sample upload + transcription": "2.8-3.2 s (17.4 s mp3)",
+    "voice/test clone (voxcpm2-hf-clone)": "35.8 s, 200",
+    "voice/test default (voxcpm2-hf)": "passed within 58 s in the parallel run",
+    "UI Test seller voice": "50.8 s -> timeout -> Cloudflare HTML text",
+    "UI Test Khmer voice (default)": "0.9 s -> HF 503 -> Cloudflare HTML text",
+    "widget voice API": "accept 0.3 s, transcript at 4.5 s, AI reply with voxcpm2-hf-clone audio at 37 s",
+    "widget voice UI": "transcript at 6 s, text-only reply at 11 s (HF returned 503 'Service Unavailable' -> correct text-only fallback, no 'couldn't hear' error)"
+  },
+  "seed_data_creation": "None kept. Seller voice deleted for admin and both loadtest businesses (verified empty). TEST_ widget conversations deleted (8 conversations, 16 messages). The loadtest+706ab4fd settings were re-PUT once (same values plus the injected id, then cleared via DELETE seller-voice).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fixtures in /tmp: short.mp3 (3 s), long.mp3 (17 s), long40.mp3 (40 s), tone35.wav, notaudio.txt, big.bin (11 MB), vox_km.mp3. Run pytest with -n 0 to see print timings (pytest.ini adds xdist). The browser_automation chromium supports fake mic after page.context.grant_permissions(['microphone']). The HF demo was flaky during testing (503s and timeouts mixed with ~36 s successes).",
+  "rca of the issue": "Friendly busy message: the backend raises HTTPException(502, friendly) (log: 'POST /api/voice/test 502'), but Cloudflare/ingress in front of the preview URL replaces 502 bodies with its HTML error page. Reproduce: curl the public URL /api/voice/test with Khmer text while HF is down -> 502 text/html. Mitigation: use another status code. Cross-tenant: GET admin settings -> take seller_voice_media_id -> PUT it into the loadtest business's settings -> 200 and persisted."
+}
