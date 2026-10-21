@@ -153,7 +153,7 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
 export const ChatWidget = () => {
   const [open, setOpen] = useState(false);
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-5 right-5 z-50 hidden md:block">
       {open && <ChatPanel className="w-[calc(100vw-2.5rem)] sm:w-[370px] h-[520px] mb-3 rise" onClose={() => setOpen(false)} />}
       <button onClick={() => setOpen(!open)} data-testid="chat-widget-toggle"
         className="ml-auto h-14 w-14 rounded-full bg-emerald-500 text-slate-950 grid place-items-center shadow-[0_0_30px_rgba(16,185,129,0.45)] hover:scale-105 transition-transform">

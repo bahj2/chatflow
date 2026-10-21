@@ -4,7 +4,7 @@ import { BACKEND_URL } from "@/lib/auth";
 export const mediaUrl = (id) => `${BACKEND_URL}/api/media/${id}`;
 
 export const AudioAtt = ({ a, testid }) => (
-  <audio controls preload="none" src={a.url || mediaUrl(a.media_id)} className="h-9 w-56 max-w-full" data-testid={testid} />
+  <audio controls preload="metadata" src={a.url || mediaUrl(a.media_id)} className="h-9 w-56 max-w-full" data-testid={testid} />
 );
 
 export const ProductCard = ({ p, testid }) => (

@@ -38,6 +38,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Admin's real bot @Dev_nara_bot webhook re-pointed to new URL after migration
 - Tested: iteration_4 + iteration_5 pass
 
+## Iteration 5 (2026-06) — Voice + product photos
+- Voice in: web widget mic (MediaRecorder), Telegram voice/audio, Messenger audio → ffmpeg (imageio-ffmpeg) → whisper-1 transcript
+- Voice out (only when customer sent voice; per-business toggle + 9 OpenAI tts-1 voices); Telegram sendVoice, Messenger audio attachment, web <audio>
+- Khmer: VoxCPM2 (self-hosted, OpenAI-compatible /v1/audio/speech) with seller voice clone (sample upload/record → 16k wav, auto transcript); used for Khmer (or all) replies; falls back to OpenAI on error/unset. NOT tested against a real VoxCPM2 server
+- Products page (≤300/business) with images in Emergent Object Storage; AI catalog in prompt, [[show:refs]] tag → product photo + name + price sent (Telegram sendPhoto, Messenger image, web cards)
+- Media served via /api/media/{id} (seller voice requires ?auth token)
+- Tested: iteration_6 pass (19/20, delete-404 fixed after)
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

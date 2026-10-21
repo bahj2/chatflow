@@ -66,7 +66,7 @@ const SellerVoice = ({ s, setS }) => {
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Upload audio
         </button>
         <input ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="seller-voice-input" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0], e.target.files[0].name)} />
-        {s.seller_voice_media_id && <audio controls src={mediaUrl(s.seller_voice_media_id)} className="h-9" data-testid="seller-voice-audio" />}
+        {s.seller_voice_media_id && <audio controls src={`${mediaUrl(s.seller_voice_media_id)}?auth=${localStorage.getItem("rf_token")}`} className="h-9" data-testid="seller-voice-audio" />}
       </div>
       {s.seller_voice_media_id && (
         <label className="block"><span className="text-xs text-slate-400 mb-1.5 block">Exact words spoken in the sample (filled in automatically — fix any mistakes, then Save)</span>

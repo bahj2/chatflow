@@ -295,6 +295,7 @@ TONES = {
 
 
 SHOW_TAG = re.compile(r"\[\[show:([^\]]*)\]\]", re.I)
+ASK_PHOTO = re.compile(r"\s*(would|do|shall|can) (you|i) (like|want|show)[^.?!]*\b(see|photo|picture|image|look)[^.?!]*\?\s*$", re.I)
 
 
 def catalog_text(products: list) -> str:
@@ -313,7 +314,10 @@ def split_show(text: str, products: list) -> tuple:
     clean = SHOW_TAG.sub("", text).strip()
     picked = [p for r in refs for p in products if p["id"].startswith(r)]
     seen = set()
-    return clean, [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:3]
+    picked = [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:3]
+    if picked:
+        clean = ASK_PHOTO.sub("", clean).strip()
+    return clean, picked
 
 
 async def load_products(bid: str) -> list:
@@ -734,10 +738,19 @@ IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 @api.get("/media/{mid}")
-async def get_media(mid: str):
+async def get_media(mid: str, auth: Optional[str] = None):
     data, doc = await M.load_media(db, mid)
     if not data:
         raise HTTPException(404, "Not found")
+    if doc["kind"] == "seller_voice":
+        try:
+            sub = jwt.decode(auth or "", JWT_SECRET, algorithms=[JWT_ALG])["sub"]
+        except jwt.InvalidTokenError:
+            raise HTTPException(401, "Not authenticated")
+        owner = await db.users.find_one({"id": sub}, {"_id": 0, "business_id": 1})
+        if not owner or owner["business_id"] != doc["business_id"]:
+            raise HTTPException(404, "Not found")
+        return Response(data, media_type=doc["content_type"], headers={"Cache-Control": "private, no-store"})
     return Response(data, media_type=doc["content_type"], headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -777,7 +790,9 @@ async def update_product(pid: str, body: ProductIn, user=Depends(current_user)):
 
 @api.delete("/products/{pid}")
 async def delete_product(pid: str, user=Depends(current_user)):
-    await db.products.update_one({"id": pid, "business_id": user["business_id"]}, {"$set": {"is_deleted": True}})
+    res = await db.products.update_one({"id": pid, "business_id": user["business_id"], "is_deleted": False}, {"$set": {"is_deleted": True}})
+    if not res.matched_count:
+        raise HTTPException(404, "Product not found")
     return {"ok": True}
 
 

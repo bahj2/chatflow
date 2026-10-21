@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 6: tested the new Products, product images, voice chat (whisper-1 speech-to-text, tts-1 voice replies), VoxCPM2 fallback and Messenger voice features end to end, plus a small regression check. Backend: 19/20 pytest tests pass. The one failure is minor: DELETE /api/products/{id} from another business returns 200 {ok:true} instead of 404, although the product is NOT actually deleted. Frontend: Products CRUD with image upload, search, edit and delete works. The AI picks the matching product in Settings (ai-test-product card shown). In the web widget, the mic button and send button swap as the user types; recording shows a timer, cancel works, and sending a voice message shows chat-msg-user-audio plus the AI reply audio (chat-msg-ai-audio). The microphone was simulated with an injected Web Audio oscillator stream (getUserMedia override). Text chat shows the chat-msg-ai-product card. The inbox shows message-user-audio, message-ai-audio and message-ai-product, and last_message starts with [Voice]. The Voice settings section works: 9 voices, preview returns engine OpenAI, seller voice upload auto-transcribes and shows the audio player and text, Khmer preview with a bogus VoxCPM2 URL falls back to OpenAI, and all voice fields persist after reload. Mobile 390px: no horizontal overflow on the landing page or Products page.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/products/{pid}", "issue": "Returns 200 {ok:true} for a product id that belongs to another business or does not exist. Data is safe because the update is filtered by business_id, but the spec expects 404. Check matched_count like update_product does."},
+      {"endpoint": "GET /api/media/{id}", "issue": "Public and unauthenticated for all media kinds, including seller_voice (a biometric voice sample) and customer voice messages. Ids are UUIDs, but consider restricting kind=seller_voice / customer voice to authenticated owners, or using signed URLs."},
+      {"endpoint": "GET /api/settings", "issue": "Returns voxcpm_key, fb_app_secret and fb_page_token in clear text to every member of the business (not new, but voxcpm_key adds another secret)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Web chat / AI product reply", "issues": ["The AI sometimes ends with 'Would you like to see it?' even though the photo card is already sent automatically; the system prompt says never ask this. Consider strengthening the prompt."]},
+      {"screen": "Chat audio players", "issues": ["Audio players use preload='none', so the duration shows 0:00 / 0:00 until played. Consider preload='metadata'."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter6_voice_products.py", "/app/backend/tests/gen_fixtures.py", "/app/test_reports/pytest/iter6.xml"],
+  "action_items": [
+    "DELETE /api/products/{pid}: return 404 when matched_count == 0 (cross-tenant or unknown id)",
+    "Optional: protect seller_voice media from public GET /api/media/{id}",
+    "Optional: tighten the catalog prompt so the AI never asks 'would you like to see it' when the photo is attached"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 978 lines; split it into routers (auth, products/media, voice, webhooks, inbox)",
+    "upload_image and public_voice read the whole upload into memory before the size check. Fine for 5/10 MB, but consider streaming / a Content-Length precheck",
+    "handle_incoming: if transcription fails, the AI is asked to reply to '(voice message)'. Consider a fallback reply asking the customer to type",
+    "products.image_media_id is not checked to belong to the same business (a client could reference any media id)",
+    "Whisper transcribes noise or silence into gibberish (e.g. 'aaaAAAA'). Consider a minimum duration or no-speech check"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter6_voice_products.py", "/app/backend/tests/gen_fixtures.py"],
+  "success_rate": {"backend": "95% (19/20)", "frontend": "100%"},
+  "seed_data_creation": "Registered 2 isolated businesses: 'TEST_Iter6 Shop' (test_iter6_*@example.com / test1234; fake fb tokens, voxcpm bogus URL) and 'TEST_UI6 Bags' (test_ui6_5876@example.com / test1234, bid 5e00e34a-48f0-4126-91e9-9e06719a6093, product TEST_Leather Tote Bag, voice=onyx, voice_replies=false, voxcpm_url bogus). There is no delete-business API, so they remain. All products created in Sunrise Coffee were deleted (verified 0 products). Several TEST_ web conversations remain in Sunrise Coffee (no conversation delete API). The admin business and its Telegram bot were not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fixtures: run `python /app/backend/tests/gen_fixtures.py`; it creates /tmp/rf_fixtures (ogg/mp3 speech, png). The 11MB big.bin is created with dd. Voice UI in headless mode: override navigator.mediaDevices.getUserMedia via add_init_script with an AudioContext oscillator MediaStreamDestination; this works for recording and upload. The inbox search q does not match external_id. Voice round-trip takes ~8s."
+}
