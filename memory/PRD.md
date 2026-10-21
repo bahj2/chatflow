@@ -72,6 +72,13 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Endpoints: GET/DELETE /api/notion, POST /api/notion/connect (10/h), POST /api/notion/sync (30/h)
 - Tested with MOCKED Notion via scripts/notion_mock_sync.py (iteration_10 100%); NOT yet tested with a real Notion workspace
 
+## Iteration 10 (2026-06) — Khmer voice = HF VoxCPM2 demo only
+- User choice: Khmer voice replies use ONLY the free official HF Space openbmb/VoxCPM-Demo (gradio /gradio_api/call/generate, voice design "A warm, friendly young woman", no cloning); 45 s timeout; if down/slow → reply is sent as TEXT only (no Microsoft/Azure, no self-hosted fallback). Other languages keep OpenAI tts-1
+- media.hf_voxcpm() + speak(); /api/voice/test simplified (502 friendly message when HF is down)
+- Removed from Settings screen: Colab/Modal wizard, seller voice sample, Microsoft voice picker, "use VoxCPM2 for" (backend pairing endpoints + VoxAutoConnect.jsx file kept, unused)
+- Verified: HF Khmer audio round-trip transcript exact; widget voice → voxcpm2-hf audio; simulated HF down → text-only reply
+
+
 
 
 ## Backlog

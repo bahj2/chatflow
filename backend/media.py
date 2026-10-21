@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import os
 import re
 import subprocess
@@ -147,27 +148,39 @@ async def voxcpm_tts(s, text: str, ref_wav: bytes) -> bytes:
     return await to_mp3(r.content)
 
 
+HF_VOXCPM = "https://openbmb-voxcpm-demo.hf.space"
+HF_VOICE = "A warm, friendly young woman"
+HF_TIMEOUT = 45
+
+
+async def hf_voxcpm(text: str) -> bytes:
+    """Khmer speech from the free official VoxCPM2 Hugging Face demo (voice design, no cloning)."""
+    async def run():
+        async with httpx.AsyncClient(timeout=HF_TIMEOUT) as h:
+            r = await h.post(f"{HF_VOXCPM}/gradio_api/call/generate", json={"data": [text, HF_VOICE, None, False, "", 2.0, False, False]})
+            r.raise_for_status()
+            eid, event = r.json()["event_id"], None
+            async with h.stream("GET", f"{HF_VOXCPM}/gradio_api/call/generate/{eid}") as s:
+                async for line in s.aiter_lines():
+                    if line.startswith("event:"):
+                        event = line[6:].strip()
+                    elif line.startswith("data:") and event == "error":
+                        raise RuntimeError(f"VoxCPM2 demo error: {line[5:].strip()[:200]}")
+                    elif line.startswith("data:") and event == "complete":
+                        url = json.loads(line[5:])[0]["url"]
+                        if not url.startswith(HF_VOXCPM + "/"):
+                            raise RuntimeError("VoxCPM2 demo returned an unexpected file link")
+                        a = await h.get(url)
+                        a.raise_for_status()
+                        return a.content
+            raise RuntimeError("VoxCPM2 demo returned no audio")
+    return await to_mp3(await asyncio.wait_for(run(), HF_TIMEOUT))
+
+
 async def speak(db, s, text: str) -> tuple:
-    """Returns (mp3_bytes, engine)."""
+    """Returns (mp3_bytes, engine). Khmer uses only the HF VoxCPM2 demo and raises if it is down (caller sends text only)."""
     text = EMOJI.sub("", text).strip()
-    khmer = bool(KHMER.search(text))
-    use_vox = s.voxcpm_url and (s.voxcpm_for == "all" or khmer)
-    if use_vox:
-        try:
-            ref = None
-            if s.seller_voice_media_id:
-                ref, _ = await load_media(db, s.seller_voice_media_id)
-            return await voxcpm_tts(s, text, ref), "voxcpm2"
-        except Exception as e:  # fall back to OpenAI voice
-            print(f"VoxCPM2 failed, falling back: {e}")
-    if khmer:
-        try:
-            return await microsoft_khmer(text, s.khmer_voice), "microsoft"
-        except Exception as e:
-            print(f"Microsoft Khmer voice failed, using gpt-4o-mini-tts: {e}")
-            audio = await OpenAITextToSpeech(api_key=EMERGENT_KEY).generate_speech(
-                text=text[:4000], model="gpt-4o-mini-tts", voice=s.voice if s.voice in VOICES else "nova",
-                instructions="Speak natural, native Cambodian Khmer with clear Phnom Penh pronunciation.")
-            return audio, "openai-hd"
+    if KHMER.search(text):
+        return await hf_voxcpm(text), "voxcpm2-hf"
     audio = await OpenAITextToSpeech(api_key=EMERGENT_KEY).generate_speech(text=text[:4000], model="tts-1", voice=s.voice if s.voice in VOICES else "nova")
     return audio, "openai"

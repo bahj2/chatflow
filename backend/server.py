@@ -842,21 +842,18 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form(""), user=
 @api.post("/voice/test")
 async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     s = await get_settings(user["business_id"])
-    s = s.model_copy(update={k: v for k, v in {"voice": body.voice, "khmer_voice": body.khmer_voice}.items() if v})
-    text, audio, engine, vox_error = body.text[:500], None, None, None
-    if s.voxcpm_url and (s.voxcpm_for == "all" or M.KHMER.search(text)):
-        try:
-            ref = (await M.load_media(db, s.seller_voice_media_id))[0] if s.seller_voice_media_id else None
-            audio, engine = await M.voxcpm_tts(s, M.EMOJI.sub("", text), ref), "voxcpm2"
-        except Exception as e:
-            vox_error = vox_msg(e)
+    if body.voice:
+        s = s.model_copy(update={"voice": body.voice})
     try:
-        if audio is None:
-            audio, engine = await M.speak(db, s.model_copy(update={"voxcpm_url": ""}), text)
+        audio, engine = await M.speak(db, s, body.text[:500])
     except Exception as e:
-        raise HTTPException(502, f"Voice generation failed: {e}")
+        logger.warning("voice test failed: %s", e)
+        if M.KHMER.search(body.text):
+            raise HTTPException(502, "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. "
+                                     "Customers get the reply as text until it is back. Try again in a minute.")
+        raise HTTPException(502, "Voice generation failed. Please try again.")
     doc = await M.save_media(db, user["business_id"], audio, "audio/mpeg", "voice_test")
-    return {"media_id": doc["id"], "engine": engine, "vox_error": vox_error}
+    return {"media_id": doc["id"], "engine": engine}
 
 
 def vox_msg(e: Exception) -> str:
