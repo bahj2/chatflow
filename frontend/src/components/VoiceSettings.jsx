@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const VOICES = [["nova", "Nova — energetic"], ["shimmer", "Shimmer — bright"], ["coral", "Coral — warm"], ["alloy", "Alloy — neutral"], ["ash", "Ash — clear"],
   ["echo", "Echo — calm"], ["fable", "Fable — expressive"], ["onyx", "Onyx — deep"], ["sage", "Sage — measured"]];
 
+const ENGINES = { voxcpm2: "VoxCPM2 (seller voice)", microsoft: "Microsoft native Khmer voice", "openai-hd": "OpenAI gpt-4o-mini-tts", openai: "OpenAI" };
+
 const Preview = ({ text, label, testid }) => {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState(null);
@@ -26,7 +28,7 @@ const Preview = ({ text, label, testid }) => {
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} {label}
       </button>
       {res && <><audio controls autoPlay src={mediaUrl(res.media_id)} className="h-9" data-testid={`${testid}-audio`} />
-        <span className="text-[11px] font-mono text-slate-500" data-testid={`${testid}-engine`}>engine: {res.engine === "voxcpm2" ? "VoxCPM2 (seller voice)" : "OpenAI"}</span></>}
+        <span className="text-[11px] font-mono text-slate-500" data-testid={`${testid}-engine`}>engine: {ENGINES[res.engine] || res.engine}</span></>}
     </div>
   );
 };
@@ -78,7 +80,7 @@ const SellerVoice = ({ s, setS }) => {
 };
 
 export const VoiceSection = ({ s, setS, Section, Field }) => (
-  <Section title="Voice" desc="Customers can send voice messages. The AI understands them (50+ languages incl. Khmer) and answers with voice.">
+  <Section title="Voice" desc="Customers can send voice messages. The AI understands them (incl. Khmer) and answers with voice.">
     <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0F1522] p-4">
       <div><p className="font-medium text-sm">Reply with voice to voice messages</p><p className="text-xs text-slate-400">Typed messages always get text replies.</p></div>
       <Switch checked={s.voice_replies} onCheckedChange={(v) => setS((x) => ({ ...x, voice_replies: v }))} data-testid="voice-replies-switch" />
@@ -95,8 +97,22 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
 
     <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 space-y-4" data-testid="khmer-voice-card">
       <div>
-        <p className="font-medium text-sm">Khmer voice in the seller’s own voice — VoxCPM2</p>
-        <p className="text-xs text-slate-400 mt-1">VoxCPM2 runs on your own GPU server (e.g. <code className="font-mono">vllm serve openbmb/VoxCPM2 --omni</code>). Paste its address here. Without it, Khmer replies use the OpenAI voice above (English accent).</p>
+        <p className="font-medium text-sm">Khmer voice</p>
+        <p className="text-xs text-slate-400 mt-1">Khmer replies are spoken by a native Khmer voice (Microsoft neural). Khmer voice messages from customers are understood by Gemini 3 Flash.</p>
+      </div>
+      <Field label="Native Khmer voice">
+        <Select value={s.khmer_voice} onValueChange={(v) => setS((x) => ({ ...x, khmer_voice: v }))}>
+          <SelectTrigger data-testid="khmer-voice-select"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sreymom" data-testid="khmer-voice-sreymom">Sreymom — female</SelectItem>
+            <SelectItem value="piseth" data-testid="khmer-voice-piseth">Piseth — male</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+      <Preview text="សួស្តីបង! អរគុណសម្រាប់សាររបស់បង។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice (save first)" testid="khmer-preview-btn" />
+      <div className="border-t border-white/10 pt-4">
+        <p className="font-medium text-sm">Optional: seller’s own voice — VoxCPM2</p>
+        <p className="text-xs text-slate-400 mt-1">VoxCPM2 runs on your own GPU server (e.g. <code className="font-mono">vllm serve openbmb/VoxCPM2 --omni</code>). When set, it is used first; if it fails, the native Khmer voice above is used.</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="VoxCPM2 server URL"><Input value={s.voxcpm_url} onChange={(e) => setS((x) => ({ ...x, voxcpm_url: e.target.value }))} placeholder="https://my-gpu-server.com:8000" data-testid="voxcpm-url-input" /></Field>
@@ -112,7 +128,6 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
         </Select>
       </Field>
       <Field label="Seller voice sample (clear, quiet room, 5–10 seconds)"><SellerVoice s={s} setS={setS} /></Field>
-      <Preview text="សួស្តី! អរគុណសម្រាប់សាររបស់អ្នក។ តើខ្ញុំអាចជួយអ្វីបាន?" label="Test Khmer voice (save first)" testid="khmer-preview-btn" />
     </div>
   </Section>
 );

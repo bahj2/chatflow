@@ -93,6 +93,7 @@ class Settings(BaseModel):
     allowed_emails: List[str] = []
     voice_replies: bool = True
     voice: str = "nova"
+    khmer_voice: str = "sreymom"
     voxcpm_url: str = ""
     voxcpm_key: str = ""
     voxcpm_for: str = "khmer"
@@ -356,9 +357,13 @@ async def transcript(conv_id: str, limit: int = 20) -> str:
     return "\n".join(f"{label[m['role']]}: {m['text']}" for m in reversed(msgs))
 
 
-async def generate_reply(conv_id: str, s: Settings, products: list) -> str:
+SPOKEN = (" This reply will be SPOKEN as a voice message: write natural spoken sentences only, no emoji, no symbols like $ % or /, "
+          "write prices and numbers as words in the customer's language (e.g. in Khmer 'បីដុល្លារកន្លះ'), and do not mix in English words when replying in another language.")
+
+
+async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False) -> str:
     t = await transcript(conv_id)
-    prompt = f"Conversation so far:\n{t}\n\nWrite the assistant's next reply to the customer. Output only the reply text."
+    prompt = f"Conversation so far:\n{t}\n\nWrite the assistant's next reply to the customer.{SPOKEN if spoken else ''} Output only the reply text."
     for attempt in range(3):
         try:
             return await llm(s, system_prompt(s, products), prompt)
@@ -470,7 +475,7 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
         return None
     products = await load_products(bid)
     try:
-        reply, shown = split_show(await generate_reply(conv["id"], s, products), products)
+        reply, shown = split_show(await generate_reply(conv["id"], s, products, spoken=bool(audio and s.voice_replies)), products)
     except Exception as e:
         logger.exception("AI reply failed: %s", e)
         return None
