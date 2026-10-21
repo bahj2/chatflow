@@ -142,7 +142,7 @@ async def current_user(request: Request):
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
     email = body.email.strip().lower()
-    ident = f"{request.client.host}:{email}"
+    ident = f"{client_ip(request)}:{email}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("count", 0) >= 5 and datetime.fromisoformat(att["last"]) > datetime.now(timezone.utc) - timedelta(minutes=15):
         raise HTTPException(429, "Too many attempts. Try again in 15 minutes.")
@@ -165,11 +165,14 @@ class GoogleIn(BaseModel):
 
 @api.post("/auth/google")
 async def google_login(body: GoogleIn):
-    async with httpx.AsyncClient(timeout=20) as h:
-        r = await h.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data", headers={"X-Session-ID": body.session_id})
-    if r.status_code != 200:
+    try:
+        async with httpx.AsyncClient(timeout=20) as h:
+            r = await h.get("https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data", headers={"X-Session-ID": body.session_id})
+        g = r.json() if r.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(502, "Google sign-in is unavailable right now. Please try again.")
+    if not g.get("email"):
         raise HTTPException(401, "Google sign-in failed. Please try again.")
-    g = r.json()
     email = g["email"].strip().lower()
     s = await get_settings()
     allowed = {e.strip().lower() for e in s.allowed_emails} | {os.environ['ADMIN_EMAIL'].lower()}
@@ -203,6 +206,7 @@ async def read_settings(user=Depends(current_user)):
 
 @api.put("/settings")
 async def write_settings(body: Settings, user=Depends(current_user)):
+    body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", e.strip())})
     await db.settings.update_one({"key": "main"}, {"$set": body.model_dump()}, upsert=True)
     return body.model_dump()
 

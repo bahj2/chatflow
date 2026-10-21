@@ -25,6 +25,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - AI customer summary (intent, stage, details, next step), cached by message count; side panel ≥1280px, strip below, intent tag in list
 - Tested: iteration_2 all flows pass; XFF bypass fixed after
 
+## Iteration 3 (2026-06)
+- Emergent-managed Google login added alongside email/password; only emails in AI Settings → Team access (settings.allowed_emails) + ADMIN_EMAIL may sign in; both methods issue the same JWT
+- Tested: iteration_3 pass; minor fixes (login lockout uses real client IP, allowed_emails normalised server-side, Google errors → 401/502)
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

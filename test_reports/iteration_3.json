@@ -1,0 +1,35 @@
+{
+  "summary": "Tested Emergent Google login + allowed-list (Team access) + password login regression. Backend: 39/40 pytest pass (new file test_iter3_google_auth.py 9/9). Only failure is pre-existing brute-force lockout test which is flaky (~50%) due to IP-keyed lockout behind multi-replica ingress. Frontend: google-login-btn redirects to auth.emergentagent.com/?redirect=<origin>/dashboard -> Google accounts page; /dashboard#session_id=bogus shows auth-callback then /login with 'Google sign-in failed. Please try again.'; password login, dashboard, logout, protected route redirect all work; Team access add (trim+lowercase), Enter key add, invalid toast, remove, save + reload persistence all work; other settings unchanged; Channels page loads. allowed_emails left empty after cleanup.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/auth/login", "issue": "Brute-force lockout keyed on request.client.host (ingress pod IP, varies per request) -> 6th failed attempt returns 429 only ~50% of the time; also unrelated users behind same ingress IP share counters. Use first X-Forwarded-For IP (helper already exists near line 320) instead."},
+      {"endpoint": "PUT /api/settings", "issue": "allowed_emails not validated/normalized server-side (no email format check, no lowercase/dedupe). Frontend validates, but API accepts any strings. Also clients omitting allowed_emails silently reset it to []."},
+      {"endpoint": "POST /api/auth/google", "issue": "g['email'] KeyError and httpx network errors (timeout/connect) are unhandled -> 500 instead of 401/502."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter3_google_auth.py", "/app/backend/tests/test_replyflow_api.py", "/app/test_reports/pytest/pytest_iter3.xml"],
+  "action_items": [
+    "Fix lockout identifier to use client IP from X-Forwarded-For (flaky test_bruteforce_lockout)",
+    "Optional: validate/normalize allowed_emails in backend (EmailStr, lowercase, dedupe)",
+    "Optional: wrap Emergent session-data call in try/except and handle missing email -> 401"
+  ],
+  "critical_code_review_comments": [
+    "Removing an email from allowed_emails does not revoke existing 7-day JWTs of that Google user; current_user does not re-check allow list.",
+    "All Google users get role admin and can edit allowed_emails (including removing others) - acceptable per spec but worth noting.",
+    "Login error from AuthCallback is passed via router location.state; it persists on page refresh of /login (minor)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter3_google_auth.py"],
+  "success_rate": {"backend": "97.5% (39/40, 1 flaky)", "frontend": "100%"},
+  "test_credentials": "admin@replyflow.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None persisted; test allowed emails were removed (list is empty).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Real Google sign-in cannot be automated; only redirect and bogus-session paths tested. Run pytest with '-n 0' to disable xdist when debugging single tests (pytest.ini enables xdist).",
+  "rca of the issue": "test_bruteforce_lockout flaky: server.py login() builds ident=f'{request.client.host}:{email}'. Behind K8s ingress, client.host is the ingress/proxy IP, which differs across replicas, so failed-attempt counters split across idents and the 6th attempt may not hit 5. Reproduce: run the test 3x with -n 0 -> 1 pass/2 fail. Mitigation: derive IP from X-Forwarded-For first entry."
+}
