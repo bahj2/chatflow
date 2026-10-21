@@ -1,0 +1,18 @@
+{
+  "summary": "Tested the VoxCPM2 integration (Colab/Modal setup scripts, voxcpm-check, the https rule in settings, fallback with vox_error, AI Settings UI). All 4 scripts are served with status 200 and compile. The fake-model contract test (scripts/fake_voxcpm_test.py) passed every case: Khmer goes to voxcpm2 with reference_wav_path, prompt_wav_path and prompt_text passed and emoji removed; English goes to openai; a wrong key falls back to microsoft with 'Wrong API key'; a server that is down falls back to microsoft with 'Cannot reach the server'; an incoming Khmer voice message is answered with voxcpm2. The generate() argument names match the official VoxCPM2 docs (checked with a web search). All 11 new pytest tests pass. All UI checks pass: both guide cards and their one-liners use window.location.origin, copy sets the clipboard and shows a 'Copied' toast, the check button is disabled when empty and shows a red error for an unreachable URL, and a bogus saved URL gives engine Microsoft plus the amber vox-error text. At 390px there is no horizontal overflow. The real model on a GPU was not tested.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "/api/voice/voxcpm-check", "issue": "The server will fetch any https URL a logged-in user enters (a small SSRF risk; it only does GET /health with a 30s timeout). Consider blocking private/internal IP addresses."}
+  ]},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [
+    {"screen": "AI Settings > VoxCPM2", "issues": ["The intro text still says 'vllm serve openbmb/VoxCPM2 --omni'. The app now uses its own /v1/audio/speech contract with ref_audio and ref_text, which a vLLM server may not accept. Consider removing that wording or noting that it is not supported.", "Test Khmer voice / Test seller voice use the SAVED settings. The label 'save first' only says this on the seller-voice button."]}
+  ]},
+  "test_report_links": ["/app/backend/tests/test_iter8_voxcpm.py", "/app/scripts/fake_voxcpm_test.py", "/app/test_reports/pytest/pytest_iter8.xml"],
+  "action_items": ["Optional: block private IPs in voxcpm-check", "Optional: update the vllm wording in the VoxCPM2 intro text"],
+  "critical_code_review_comments": ["The settings save and the check endpoint handle https differently: write_settings strips the URL and removes the trailing slash, but voxcpm_check only removes the trailing slash. A URL with spaces fails the check but saves fine. This is cosmetic.", "voxcpm_tts uses a 120s timeout. Modal cold start is 30-90s, so a whole incoming-message reply may take a long time to arrive. Acceptable."],
+  "updated_files": ["/app/backend/tests/test_iter8_voxcpm.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "The fake test uploaded a seller voice sample for Sunrise Coffee (seller_voice_media_id 3c7eef1f...). voxcpm_url and voxcpm_key were restored to empty (checked in the DB). It also created conversation session vox-e2e-1.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use Sunrise Coffee only. Run the pytest file with REACT_APP_BACKEND_URL exported. The fake contract test is scripts/fake_voxcpm_test.py (port 8099). The real VoxCPM2/Colab/Modal could not be tested."
+}

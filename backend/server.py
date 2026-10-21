@@ -289,6 +289,8 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     body.voxcpm_url = body.voxcpm_url.strip().rstrip("/")
     if body.voxcpm_url and not body.voxcpm_url.startswith("https://"):
         raise HTTPException(400, "VoxCPM2 server URL must start with https://")
+    if body.voxcpm_url and not await public_https(body.voxcpm_url):
+        raise HTTPException(400, "VoxCPM2 server URL must be a public internet address")
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
@@ -856,6 +858,20 @@ def vox_msg(e: Exception) -> str:
     return str(e)[:200] or e.__class__.__name__
 
 
+async def public_https(url: str) -> bool:
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+    u = urlparse(url)
+    if u.scheme != "https" or not u.hostname:
+        return False
+    try:
+        infos = await asyncio.get_running_loop().getaddrinfo(u.hostname, None)
+    except socket.gaierror:
+        return True  # unresolvable now; request will simply fail
+    return all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
+
+
 class VoxCheckIn(BaseModel):
     url: str
     key: str = ""
@@ -865,6 +881,8 @@ class VoxCheckIn(BaseModel):
 async def voxcpm_check(body: VoxCheckIn, user=Depends(current_user)):
     if not body.url.startswith("https://"):
         return {"ok": False, "error": "The address must start with https://"}
+    if not await public_https(body.url):
+        return {"ok": False, "error": "This address is not allowed (private or internal network)"}
     try:
         async with httpx.AsyncClient(timeout=30) as h:
             r = await h.get(f"{body.url.rstrip('/')}/health", headers={"Authorization": f"Bearer {body.key}"} if body.key else {})

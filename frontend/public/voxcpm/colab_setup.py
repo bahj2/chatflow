@@ -1,6 +1,6 @@
 # ReplyFlow x VoxCPM2 on Google Colab (free T4 GPU).
 # Run inside Colab with:  B="https://<your-replyflow-site>"; import urllib.request as u; exec(u.urlopen(B+"/voxcpm/colab_setup.py").read())
-import os, re, secrets, subprocess, sys, threading, time, urllib.request
+import os, re, secrets, shutil, subprocess, sys, threading, time, urllib.request
 
 BASE = globals().get("B", "").rstrip("/")
 if not BASE:
@@ -12,7 +12,8 @@ def say(msg):
 
 
 say("1/4  Checking GPU…")
-gpu = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True).stdout if os.path.exists("/usr/bin/nvidia-smi") else ""
+smi = shutil.which("nvidia-smi")
+gpu = subprocess.run([smi, "-L"], capture_output=True, text=True).stdout if smi else ""
 if "GPU" not in gpu:
     raise SystemExit("No GPU found. In Colab click: Runtime -> Change runtime type -> T4 GPU -> Save. Then run this cell again.")
 say("     " + gpu.strip())

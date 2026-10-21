@@ -170,10 +170,10 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
           </SelectContent>
         </Select>
       </Field>
-      <Preview text="សួស្តីបង! អរគុណសម្រាប់សាររបស់បង។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice" testid="khmer-preview-btn" s={s} />
+      <Preview text="សួស្តីបង! អរគុណសម្រាប់សាររបស់បង។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice (uses saved VoxCPM2 settings)" testid="khmer-preview-btn" s={s} />
       <div className="border-t border-white/10 pt-4">
         <p className="font-medium text-sm">Optional: seller’s own voice — VoxCPM2</p>
-        <p className="text-xs text-slate-400 mt-1">VoxCPM2 runs on your own GPU server (e.g. <code className="font-mono">vllm serve openbmb/VoxCPM2 --omni</code>) — free options below. It clones the seller’s voice from the sample. When set, it is used first; if it is off or fails, the native Khmer voice above is used automatically.</p>
+        <p className="text-xs text-slate-400 mt-1">VoxCPM2 needs a GPU server — use one of the free setups below (they run ReplyFlow’s VoxCPM2 server). It clones the seller’s voice from the sample. When set, it is used first; if it is off or fails, the native Khmer voice above is used automatically.</p>
       </div>
       <SetupGuides />
       <div className="grid sm:grid-cols-2 gap-4">

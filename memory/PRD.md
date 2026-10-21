@@ -54,6 +54,11 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Tested: iteration_7 8/8 pass
 - Note: edge-tts is Microsoft Edge's free read-aloud service (unofficial); official Azure Speech key = same voices, more reliable for production
 
+## Iteration 7 (2026-06) — Free VoxCPM2 hosting
+- Served by app: /voxcpm/voxcpm_server.py (FastAPI /health + /v1/audio/speech with ref_audio/ref_text cloning, Bearer key), colab_setup.py (Colab T4 + Cloudflare quick tunnel), modal_voxcpm.py + modal_setup.py (Modal L4, scale-to-zero, volume cache)
+- One-line setup guides in AI Settings; POST /api/voice/voxcpm-check; /voice/test returns vox_error; https + public-IP rule for VoxCPM2 URL
+- Contract verified with fake model (scripts/fake_voxcpm_test.py); iteration_8 pass. Real GPU run NOT tested (no GPU here); HF official Space was in RUNTIME_ERROR
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members
