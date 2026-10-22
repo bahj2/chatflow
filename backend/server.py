@@ -314,6 +314,7 @@ TONES = {
 
 
 SHOW_TAG = re.compile(r"\[\[show:([^\]]*)\]\]", re.I)
+MARKDOWN = re.compile(r"\*\*|__|^#{1,6}\s+|^\s*[*-]\s+(?=\S)", re.M)
 ASK_PHOTO = re.compile(r"\s*(would|do|shall|can) (you|i) (like|want|show)[^.?!]*\b(see|photo|picture|image|look)[^.?!]*\?\s*$", re.I)
 
 
@@ -329,12 +330,13 @@ def catalog_text(products: list) -> str:
             "with your reply, so never ask whether they want to see a photo.\n"
             "- Specific question (one product, type, budget): tag up to 3 best matches. General question (\"what do you sell?\", \"show me your products\"): "
             "briefly name what you have and tag ALL products (max 10).\n"
-            "- If the message is not about products, add no tag.")
+            "- If the message is not about products, add no tag.\n"
+            "- Write product lists as plain sentences or simple lines, never with ** or markdown.")
 
 
 def split_show(text: str, products: list) -> tuple:
     refs = [r.strip().lower() for m in SHOW_TAG.findall(text) for r in m.split(",") if r.strip()]
-    clean = SHOW_TAG.sub("", text).strip()
+    clean = MARKDOWN.sub(lambda m: "• " if m.group(0).strip() in ("*", "-") else "", SHOW_TAG.sub("", text)).strip()
     picked = [p for r in refs for p in products if p["id"].startswith(r)]
     seen = set()
     picked = [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:10]
@@ -474,6 +476,8 @@ async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes]
                     files = {f"p{i}": (f"product{i}.jpg", img, ct) for i, (_, img, ct) in enumerate(photos)}
                     r = await h.post(f"{base}/sendMediaGroup", data={"chat_id": to, "media": json.dumps(media)}, files=files)
                     logger.info("telegram products album %s %s", r.status_code, r.text[:150])
+                    if r.status_code != 200:
+                        texts = [cap for cap, _, _ in photos] + texts
                 if texts:
                     r = await h.post(f"{base}/sendMessage", json={"chat_id": to, "text": "\n".join(texts)})
                     logger.info("telegram product text %s %s", r.status_code, r.text[:150])

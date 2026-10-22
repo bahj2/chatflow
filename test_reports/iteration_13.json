@@ -1,0 +1,47 @@
+{
+  "summary": "Tested the catalog-priority fix on the loadtest business (Sunrise Coffee, bid 4f0dbc25-...). (1) User's history-bias bug: I asked 'What do you sell?' with 0 products (the AI said 'coffee shop, we don't sell digital accounts'), then created Gemini Pro 10$ with an image and asked 'I saw you sell something, what is it?' in the same session. It passed 3/3: the AI named Gemini Pro and $10, never mentioned team follow-up, and the product attachment had the right media_id. (2) General question in Khmer 'បងលក់អ្វីខ្លះ?' and in English 'What do you sell?' with 6 products (4 with images): all 6 product attachments came back each time. Specific question 'anything for design under 6 dollars?' returned only Canva Pro (1 match). (3) Khmer voice via /public/{bid}/voice with a clip I made through /voice/test (HF VoxCPM2 worked): passed 2/2. Each reply had a voxcpm2-hf audio attachment plus all 6 product attachments, no '[[show' in the text, about 22 s. (4) /api/ai/test 'what do you sell?' returned 6 products, and the Settings AI test box UI shows 6 cards. (5) Embed widget at 1920 shows 6 cards with photos, name and price, and placeholders for products without images. At 390 nothing overflows (scrollWidth 390). (6) Unit test of deliver() with httpx mocked passed 5/5: 1 photo uses sendPhoto, 2-10 use sendMediaGroup with attach://pN and per-photo captions, image-less products go in one sendMessage, voice goes out as sendVoice then the album, and split_show caps at 10.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/{bid}/chat (general product question)", "issue": "Claude sometimes ignores 'Plain text only, no markdown' and returns '• **CapCut Pro** – video editing ($6/month)' lists. The widget shows literal ** asterisks (seen in the 1920 screenshot), and Telegram/Messenger sendMessage (no parse_mode) will too. Another reply had an emoji and a blank-line list. Suggested fix: strip markdown in split_show (e.g. re.sub(r'\\*\\*|__|^#+\\s*', '', ...)) or say 'never use ** or bullet markdown' in catalog_text."},
+      {"endpoint": "deliver() telegram", "issue": "If sendMediaGroup fails (e.g. one bad/oversized image -> 400), there is no fallback, so the customer gets no product photos or names. Suggest: on a non-200 album response, send the captions as text."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Embed widget at 390px", "issues": ["Product cards (~175px wide) wrap one per row, so 6 cards make about 1100px of vertical scroll. Consider a 2-column grid or a horizontal scroll row on mobile. No overflow."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter13_catalog_priority.py",
+    "/app/backend/tests/test_iter13_deliver_unit.py",
+    "/app/backend/tests/iter13_voice_products.py",
+    "/app/backend/tests/cleanup_iter13.py",
+    "/app/test_reports/pytest/iter13_catalog.xml",
+    "/app/test_reports/pytest/iter13_deliver.xml"
+  ],
+  "action_items": [
+    "Strip markdown (** bullets) from AI replies, or tighten the prompt, so the widget and Telegram don't show literal asterisks in product-list replies",
+    "Optional: fallback text when Telegram sendMediaGroup fails",
+    "Optional: compact product card layout on mobile (2-column grid)"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1257 lines; it should be split (AI/prompt, channels/deliver, products, voice).",
+    "catalog_text sends the full catalog (up to 300 products x 160 chars) in every prompt. That is fine now but costs tokens for large catalogs.",
+    "Messenger path in deliver() sends one image and one text per product (up to 20 API calls for 10 products). Consider a generic template carousel."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter13_catalog_priority.py",
+    "/app/backend/tests/test_iter13_deliver_unit.py",
+    "/app/backend/tests/iter13_voice_products.py",
+    "/app/backend/tests/cleanup_iter13.py"
+  ],
+  "success_rate": {"backend": "100% (history bias 3/3, general KM/EN 2/2, specific 1/1, ai_test 1/1, voice 2/2, deliver unit 5/5)", "frontend": "100% functional (markdown asterisk cosmetic issue from LLM output)"},
+  "seed_data_creation": "Created 6 products plus 3 temporary Gemini Pro products in the loadtest business, and about 9 TEST_ web conversations. All products were deleted and all TEST_ and UI conversations/messages removed via cleanup_iter13.py. Uploaded image/voice media docs remain (harmless). Admin business was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run 'KEEP_PRODUCTS=1 pytest tests/test_iter13_catalog_priority.py -n 0 -s' (keeps products for UI checks), then 'python3 tests/iter13_voice_products.py' (caches the Khmer question clip at /tmp/km_ask_products.mp3), then 'python3 tests/cleanup_iter13.py'. The loadtest business info describes a coffee shop, so with 0 products the AI says it doesn't sell digital accounts. That is expected.",
+  "test_credentials": "loadtest+706ab4fd@example.com / loadtest123 (owner, used); admin not used"
+}
