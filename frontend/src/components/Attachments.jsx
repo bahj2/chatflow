@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ImageOff, CheckCircle2, Clock, XCircle, ExternalLink, Check } from "lucide-react";
 import { BACKEND_URL } from "@/lib/auth";
 
@@ -27,6 +28,12 @@ const KHQR_STATE = {
 
 export const KhqrCard = ({ a, testid, onMarkPaid }) => {
   const [Icon, cls, label] = KHQR_STATE[a.status] || KHQR_STATE.pending;
+  const [confirm, setConfirm] = useState(false);
+  const markPaid = () => {
+    if (a.status === "pending" || confirm) return onMarkPaid(a.order_id);
+    setConfirm(true);
+    setTimeout(() => setConfirm(false), 4000);
+  };
   return (
     <div className="w-52 max-w-full rounded-2xl overflow-hidden border border-white/10 bg-white" data-testid={testid}>
       <img src={mediaUrl(a.media_id)} alt={`KHQR ${a.amount_text}`} className={`w-full ${a.status === "pending" || a.status === "paid" ? "" : "opacity-40 grayscale"}`} />
@@ -35,8 +42,8 @@ export const KhqrCard = ({ a, testid, onMarkPaid }) => {
         <p className={`text-[11px] flex items-center gap-1 ${cls}`} data-testid={`${testid}-status`}><Icon className="h-3.5 w-3.5 shrink-0" /> {label(a)}</p>
         {a.status === "pending" && a.deeplink && <a href={a.deeplink} target="_blank" rel="noreferrer" data-testid={`${testid}-deeplink`}
           className="flex items-center justify-center gap-1 rounded-lg bg-red-600 text-white py-1.5 text-xs font-semibold hover:bg-red-500"><ExternalLink className="h-3.5 w-3.5" /> Pay with Bakong</a>}
-        {onMarkPaid && a.status !== "paid" && <button type="button" onClick={() => onMarkPaid(a.order_id)} data-testid={`${testid}-mark-paid`}
-          className="w-full flex items-center justify-center gap-1 rounded-lg border border-emerald-500/40 text-emerald-300 py-1.5 text-xs font-semibold hover:bg-emerald-500/10"><Check className="h-3.5 w-3.5" /> Mark paid</button>}
+        {onMarkPaid && a.status !== "paid" && <button type="button" onClick={markPaid} data-testid={`${testid}-mark-paid`}
+          className="w-full flex items-center justify-center gap-1 rounded-lg border border-emerald-500/40 text-emerald-300 py-1.5 text-xs font-semibold hover:bg-emerald-500/10"><Check className="h-3.5 w-3.5" /> {confirm ? "Really received? Click again" : "Mark paid"}</button>}
       </div>
     </div>
   );

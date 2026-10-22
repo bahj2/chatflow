@@ -347,7 +347,8 @@ def catalog_text(products: list, payments: bool = False) -> str:
                "[[order:ref1*2,ref2*1]] (ref*quantity, only refs that exist). A Bakong KHQR payment QR for the exact total is sent automatically: "
                "tell them the total and that they can scan it with any Cambodian bank app (ABA, ACLEDA, Wing, Bakong...) within 10 minutes. "
                "If the product or quantity is unclear, ask first and add no order tag. Only add the order tag again if they change the order "
-               "or ask for a new QR (e.g. it expired)." if payments else ""))
+               "or ask for a new QR (e.g. it expired). One order can only contain products priced in the same currency with one exact price; "
+               "otherwise ask them to order separately, or for price ranges say a team member will confirm the price, and add no order tag." if payments else ""))
 
 
 def split_show(text: str, products: list) -> tuple:
@@ -620,7 +621,7 @@ async def create_order(conv: dict, s: Settings, items: list) -> Optional[dict]:
         lines.append({"product_id": p["id"], "name": p["name"], "price": p.get("price", ""), "unit": price[0], "qty": qty,
                       "total": round(price[0] * qty, 2)})
     total = round(sum(x["total"] for x in lines), 2 if currency == "USD" else 0)
-    number = "RF-" + secrets.token_hex(3).upper()
+    number = "RF-" + secrets.token_hex(4).upper()
     try:
         q = await P.make_qr(s, total, currency, number)
     except Exception as e:
@@ -1448,6 +1449,7 @@ async def startup():
     await db.cron_runs.create_index("created", expireAfterSeconds=7 * 86400)
     await db.orders.create_index("id", unique=True)
     await db.orders.create_index([("business_id", 1), ("created_at", -1)])
+    await db.orders.create_index([("business_id", 1), ("number", 1)], unique=True)
     await db.orders.create_index([("status", 1), ("mode", 1), ("expires_at", 1)])
     await db.messages.create_index("attachments.order_id", sparse=True)
     app.state.payments_task = asyncio.create_task(payments_loop())

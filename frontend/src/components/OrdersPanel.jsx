@@ -20,7 +20,14 @@ export const StatusPill = ({ status, testid }) => {
   return <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${cls}`} data-testid={testid}>{label}</span>;
 };
 
-const OrderRow = ({ o, onAction }) => (
+const OrderRow = ({ o, onAction }) => {
+  const [confirm, setConfirm] = useState(false);
+  const markPaid = () => {
+    if (o.status === "pending" || confirm) return onAction(o, "mark-paid");
+    setConfirm(true);
+    setTimeout(() => setConfirm(false), 4000);
+  };
+  return (
   <li className="flex flex-col sm:flex-row gap-4 rounded-xl border border-white/10 bg-[#0F1522] p-4" data-testid={`order-${o.number}`}>
     <img src={mediaUrl(o.qr_media_id)} alt="KHQR" className="w-20 h-28 object-cover object-top rounded-lg shrink-0" />
     <div className="flex-1 min-w-0 space-y-1.5">
@@ -37,15 +44,16 @@ const OrderRow = ({ o, onAction }) => (
       <span className="text-lg font-bold text-emerald-300" data-testid={`order-total-${o.number}`}>{money(o)}</span>
       {o.status !== "paid" && (
         <div className="flex gap-2">
-          <button onClick={() => onAction(o, "mark-paid")} data-testid={`order-mark-paid-${o.number}`}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 text-slate-950 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-400"><Check className="h-3.5 w-3.5" /> Mark paid</button>
+          <button onClick={markPaid} data-testid={`order-mark-paid-${o.number}`} title={o.status === "pending" ? "" : "This QR expired or was replaced — only confirm if you really received this payment"}
+            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500 text-slate-950 px-3 py-1.5 text-xs font-semibold hover:bg-emerald-400"><Check className="h-3.5 w-3.5" /> {confirm ? "Really received? Click again" : "Mark paid"}</button>
           {o.status !== "cancelled" && <button onClick={() => onAction(o, "cancel")} data-testid={`order-cancel-${o.number}`}
             className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 hover:text-red-300"><X className="h-3.5 w-3.5" /> Cancel</button>}
         </div>
       )}
     </div>
   </li>
-);
+  );
+};
 
 export default function OrdersPanel() {
   const [orders, setOrders] = useState(null);

@@ -1,0 +1,36 @@
+{
+  "summary": "Bakong KHQR payments tested end-to-end. Live API: 19/20 pass. Covered: settings validation (bad account / non-rbk token give 400), preview (local $1.00 QR decoded with a valid EMV string, CRC, tag 99 = +600000 ms), fake rbk token gives 400 'KHQR.dev token problem', AI order flow on the widget (a vague question sends no QR; '2 lattes' sends $5.00 khqr pending RF-XXXXXX, expiry ~10 min; decoded QR passes CRC, has tags 54=5, 53=840, 29 account, 59 merchant, 62 bill=number, 99 10 min; 'make it 3' sends $7.50 and the old order plus its attachment become cancelled), Khmer ordering, KHR product (15,000៛, tag 53=116), range price '10-15$' adds the QR_FAIL line, payments OFF sends no khqr, ai/test order_total '$5.00' with no order created, mark-paid (paid_by seller:<email>, attachment paid, a single 'Payment received' message, 2nd call gives 409, cancelling a paid order gives 409), Khmer paid message, cancel, cross-tenant 404 and list isolation, status filter and 422 for a bad filter, background expiry (expires_at set in the past becomes expired with the attachment updated within seconds; the main agent's RF-BF6F0C also expired by itself). Unit tests (9/9 pass): AUTOMATIC mode with make_qr/bulk_paid mocked (paid_by auto, idempotent, a single paid message), relay PaymentError keeps the order pending, late=True settles an expired order but ignores orders older than 24 h, a failed mixed-currency order does not cancel the current pending one, deliver() Telegram sendPhoto with caption + 'Pay with Bakong' inline button (and no button without a deeplink), Messenger image + caption with deeplink. UI: Settings payments section (fields, password token input, khqr.dev link, Off/Manual/Automatic badge updates live, error toast on a bad account, preview image), AI test box shows ai-test-order, Orders page (thumbnails load, pills, totals, all 5 filters, empty state for expired, cancel/mark-paid toasts), Inbox KHQR card Mark paid (status turns 'Paid — thank you!' and the paid message shows), widget card at 390px with polling (paid status and 'Payment received' message arrive). No horizontal overflow at 390px for widget, Orders, Settings or Inbox.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "handle_incoming QR_FAIL language pick (server.py ~line 573) + settle_order lang", "issue": "M.KHMER = [\\u1780-\\u17FF] also matches the riel sign '៛' (U+17DB). An English reply that mentions a KHR price, such as the mixed-currency case 'Your total is $2.5 + 15,000៛ ...', gets the KHMER fallback line instead of the English one. settle_order has the same problem: if the customer's last message contains '៛', the 'Payment received' message is sent in Khmer. Fix: detect Khmer with letters only, e.g. re.compile(r'[\\u1780-\\u17D3]') or strip ៛ before the check."},
+      {"endpoint": "catalog_text PAYMENT rule", "issue": "When an order can't be created (mixed currency or range price), the AI text still says 'I'm sending you a KHQR / scan it ...' and the fallback line then contradicts it. For mixed carts the AI quoted '$2.5 + 15,000៛'. Consider telling the model that all products in one order must share a currency, or rewriting the reply when the order fails."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Orders page", "issues": ["Cancelled (replaced) orders still show a 'Mark paid' button. The backend allows it (status != paid), so a seller can mark a replaced QR paid and the customer gets a 'Payment received' message for a superseded order. Probably intended for late payments, but consider a confirm step."]},
+      {"screen": "Widget/Inbox", "issues": ["Chat does not re-scroll after the KHQR image (about 600px tall) finishes loading, so the card can sit partly below the fold at first (minor)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter15_khqr_live.py", "/app/backend/tests/test_iter15_khqr_auto_unit.py", "/app/test_reports/pytest/iter15_live.xml", "/app/test_reports/pytest/iter15_unit.xml"],
+  "action_items": [
+    "Use a Khmer-letters-only regex (exclude U+17DB riel sign) when choosing the QR_FAIL and PAID_MSG language",
+    "Optional: prompt the model that one order must use a single currency, or soften the 'sending QR' text when create_order fails"
+  ],
+  "critical_code_review_comments": [
+    "Order number is 6 hex chars with no unique index on (business_id, number). Collision is unlikely but possible; add a unique index or retry.",
+    "GET /api/settings returns khqr_token in plain text to every business member (same pattern as the other channel tokens); consider masking it.",
+    "server.py is about 1490 lines; the Orders/KHQR section (lines 589-757) could move to its own module.",
+    "settle_order and the update_many in expire_orders are race-safe (status-guarded), so several workers running payments_loop is fine."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter15_khqr_live.py", "/app/backend/tests/test_iter15_khqr_auto_unit.py"],
+  "success_rate": {"backend": "96% (28/29: 19/20 live + 9/9 unit; the 1 failure is the riel-sign language bug)", "frontend": "100%"},
+  "seed_data_creation": "None kept. Cleanup done: removed 10 TEST_/widget conversations, 30 messages, 8 test orders and 2 TEST products in loadtest. Loadtest settings still have bakong_account_id sambath@aclb, merchant Sunrise Coffee and khqr_token ''. Main agent's RF-8A452A (cancelled) and RF-BF6F0C (now auto-expired) were kept. Admin business not modified (read-only checks).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/test_iter15_khqr_live.py (uses xdist via pytest.ini; uses about 12 LLM chats, watch the 20/min IP rate limit) and `set -a; . ./.env; set +a; pytest tests/test_iter15_khqr_auto_unit.py -p no:cacheprovider` (creates and deletes a TEST_biz_khqr_* business in Mongo). Live tests create TEST_khqr_* web sessions; clean up via Mongo by conversation name ^TEST_. test_g_mixed fails until the riel-sign language fix is made.",
+  "rca of the issue": "Mixed-currency QR_FAIL came out in Khmer for an English chat. handle_incoming picks QR_FAIL['km'] when M.KHMER.search(reply) matches. M.KHMER covers the whole Khmer Unicode block, which includes the currency symbol ៛ (U+17DB) that English replies use for KHR prices. Repro: product priced '15000៛' plus latte '2.5$', English message 'I want to buy 1 latte and 1 <khr product>, confirmed' -> reply ends with the Khmer apology. Fix: use [\\u1780-\\u17D3\\u17E0-\\u17E9] (letters and digits) or remove ៛ before matching."
+}
