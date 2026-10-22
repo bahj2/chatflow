@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Attachments } from "@/components/Attachments";
 import { VoiceSection } from "@/components/VoiceSettings";
 import { NotionSection } from "@/components/NotionSection";
+import { PaymentsSection } from "@/components/PaymentsSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Section = ({ title, desc, children }) => (
@@ -47,6 +48,7 @@ const Tester = () => {
       </div>
       {a && <p className="text-sm text-slate-200 whitespace-pre-wrap" data-testid="ai-test-reply">{a.reply}</p>}
       {a?.products?.length > 0 && <Attachments atts={a.products} prefix="ai-test" />}
+      {a?.order_total && <p className="text-xs text-amber-300" data-testid="ai-test-order">A Bakong KHQR for {a.order_total} would be sent to the customer (no order is created in this test).</p>}
     </div>
   );
 };
@@ -113,6 +115,8 @@ export default function SettingsPanel() {
         </Section>
 
         <NotionSection Section={Section} />
+
+        <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
 
         <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own).">
           <div className="flex gap-2">

@@ -65,7 +65,7 @@ const ROLE = {
   agent: { Icon: Headphones, label: "You", cls: "bg-indigo-500/[0.1] border-indigo-500/30" },
 };
 
-const Bubble = ({ m }) => {
+const Bubble = ({ m, onMarkPaid }) => {
   const r = ROLE[m.role];
   const mine = m.role !== "user";
   return (
@@ -78,7 +78,7 @@ const Bubble = ({ m }) => {
           {(m.attachments || []).filter((a) => a.type === "audio").map((a, i) => <AudioAtt key={i} a={a} testid={`message-${m.role}-audio`} />)}
           <p className={(m.attachments || []).some((a) => a.type === "audio") ? "text-xs text-slate-300" : ""}>{m.text}</p>
         </div>
-        <div className={`mt-2 flex ${mine ? "justify-end" : ""}`}><Attachments atts={(m.attachments || []).filter((a) => a.type === "product")} prefix={`message-${m.role}`} /></div>
+        <div className={`mt-2 flex ${mine ? "justify-end" : ""}`}><Attachments atts={(m.attachments || []).filter((a) => a.type === "product" || a.type === "khqr")} prefix={`message-${m.role}`} onMarkPaid={onMarkPaid} /></div>
       </div>
     </div>
   );
@@ -163,6 +163,9 @@ const ChatView = ({ conv, onBack, onChange, quick }) => {
     return () => clearTimeout(t);
   }, [msgs.length, conv.id]);  // eslint-disable-line react-hooks/exhaustive-deps
   const load = () => api.get(`/conversations/${conv.id}/messages`).then((r) => setMsgs(r.data));
+  const markPaid = async (orderId) => {
+    try { await api.post(`/orders/${orderId}/mark-paid`); toast.success("Marked as paid — the customer was told"); load(); } catch (e) { toast.error(errMsg(e)); }
+  };
 
   useEffect(() => {
     load();
@@ -198,7 +201,7 @@ const ChatView = ({ conv, onBack, onChange, quick }) => {
       </div>
       <SummaryStrip summary={summary} loading={sumLoading} />
       <div ref={end} className="flex-1 overflow-y-auto p-5 space-y-4">
-        {msgs.map((m) => <Bubble key={m.id} m={m} />)}
+        {msgs.map((m) => <Bubble key={m.id} m={m} onMarkPaid={markPaid} />)}
       </div>
       <Composer conv={conv} onSent={load} quick={quick} />
     </div>

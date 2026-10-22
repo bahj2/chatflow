@@ -127,7 +127,7 @@ export const ChatPanel = ({ className = "", onClose, visitorName = "Website visi
                 {(m.attachments || []).filter((a) => a.type === "audio").map((a, i) => <AudioAtt key={i} a={a} testid={`chat-msg-${m.role}-audio`} />)}
                 <p className={voice ? "text-xs opacity-80" : ""}>{m.text}</p>
               </div>
-              <Attachments atts={(m.attachments || []).filter((a) => a.type === "product")} prefix={`chat-msg-${m.role}`} />
+              <Attachments atts={(m.attachments || []).filter((a) => a.type === "product" || a.type === "khqr")} prefix={`chat-msg-${m.role}`} />
             </div>
           );
         })}

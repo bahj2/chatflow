@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 import media as M
 import notion_kb as N
+import payments as P
 
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
@@ -101,6 +102,10 @@ class Settings(BaseModel):
     voxcpm_for: Literal["khmer", "all"] = "khmer"
     seller_voice_media_id: str = ""
     seller_voice_text: str = ""
+    bakong_account_id: str = Field("", max_length=60)
+    bakong_merchant_name: str = Field("", max_length=25)
+    bakong_city: str = Field("Phnom Penh", max_length=15)
+    khqr_token: str = Field("", max_length=300)
 
 
 class ProductIn(BaseModel):
@@ -299,6 +304,11 @@ async def write_settings(body: Settings, user=Depends(current_user)):
         body.seller_voice_text = cur.seller_voice_text  # stale tab: keep the transcript of the stored sample
     body.seller_voice_media_id = cur.seller_voice_media_id  # only /settings/seller-voice may change it
     body.seller_voice_text = body.seller_voice_text[:500]
+    body.bakong_account_id, body.khqr_token = body.bakong_account_id.strip(), body.khqr_token.strip()
+    if body.bakong_account_id and not P.ACCOUNT_RE.match(body.bakong_account_id):
+        raise HTTPException(400, "Bakong account ID looks wrong. Example: name@aclb")
+    if body.khqr_token and not body.khqr_token.startswith(P.RELAY_PREFIX):
+        raise HTTPException(400, "KHQR.dev token must start with rbk")
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
     return body.model_dump()
@@ -314,11 +324,12 @@ TONES = {
 
 
 SHOW_TAG = re.compile(r"\[\[show:([^\]]*)\]\]", re.I)
+ORDER_TAG = re.compile(r"\[\[order:([^\]]*)\]\]", re.I)
 MARKDOWN = re.compile(r"\*\*|__|^#{1,6}[ \t]+|^[ \t]*[*-][ \t]+(?=\S)", re.M)
 ASK_PHOTO = re.compile(r"\s*(would|do|shall|can) (you|i) (like|want|show)[^.?!]*\b(see|photo|picture|image|look)[^.?!]*\?\s*$", re.I)
 
 
-def catalog_text(products: list) -> str:
+def catalog_text(products: list, payments: bool = False) -> str:
     if not products:
         return ""
     rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'} | {(p.get('description') or '')[:160]}" for p in products)
@@ -331,18 +342,34 @@ def catalog_text(products: list) -> str:
             "- Specific question (one product, type, budget): tag up to 3 best matches. General question (\"what do you sell?\", \"show me your products\"): "
             "briefly name what you have and tag ALL products (max 10).\n"
             "- If the message is not about products, add no tag.\n"
-            "- Write product lists as plain sentences or simple lines, never with ** or markdown.")
+            "- Write product lists as plain sentences or simple lines, never with ** or markdown."
+            + ("\n- PAYMENT: when the customer clearly confirms they want to buy (which product and how many), END your reply with a tag like "
+               "[[order:ref1*2,ref2*1]] (ref*quantity, only refs that exist). A Bakong KHQR payment QR for the exact total is sent automatically: "
+               "tell them the total and that they can scan it with any Cambodian bank app (ABA, ACLEDA, Wing, Bakong...) within 10 minutes. "
+               "If the product or quantity is unclear, ask first and add no order tag. Only add the order tag again if they change the order "
+               "or ask for a new QR (e.g. it expired)." if payments else ""))
 
 
 def split_show(text: str, products: list) -> tuple:
     refs = [r.strip().lower() for m in SHOW_TAG.findall(text) for r in m.split(",") if r.strip()]
-    clean = MARKDOWN.sub(lambda m: "• " if m.group(0).strip() in ("*", "-") else "", SHOW_TAG.sub("", text)).strip()
+    clean = MARKDOWN.sub(lambda m: "• " if m.group(0).strip() in ("*", "-") else "", ORDER_TAG.sub("", SHOW_TAG.sub("", text))).strip()
     picked = [p for r in refs for p in products if p["id"].startswith(r)]
     seen = set()
     picked = [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:10]
     if picked:
         clean = ASK_PHOTO.sub("", clean).strip()
     return clean, picked
+
+
+def order_items(text: str, products: list) -> list:
+    items = {}
+    for m in ORDER_TAG.findall(text):
+        for part in m.split(","):
+            ref, _, qty = part.strip().lower().partition("*")
+            p = next((p for p in products if ref and p["id"].startswith(ref)), None)
+            if p:
+                items[p["id"]] = (p, max(1, min(99, int(qty) if qty.strip().isdigit() else 1)))
+    return list(items.values())[:10]
 
 
 async def load_products(bid: str) -> list:
@@ -366,7 +393,7 @@ def system_prompt(s: Settings, products: Optional[list] = None, knowledge: str =
         f"Understand what the customer really wants, answer it directly, and suggest a next step when helpful. {lang} "
         "Only use the business information, FAQs, Notion knowledge and product catalog for facts like prices, hours or policies; only for facts none of them cover, say a team member will follow up. "
         "Never mention you are an AI model name. Plain text only, no markdown."
-        + catalog_text(products or [])
+        + catalog_text(products or [], P.enabled(s))
     )
 
 
@@ -391,7 +418,7 @@ async def transcript(conv_id: str, limit: int = 20) -> str:
 SPOKEN = (" This reply will be SPOKEN as a voice message: write natural spoken sentences only, no emoji, no symbols like $ % or /, "
           "write prices and numbers as words in the customer's language (e.g. in Khmer 'បីដុល្លារកន្លះ'), and never mix in English words when replying in another language "
           "(translate or transliterate product terms, e.g. 'gluten' -> 'ស្អិត'). If you show several products, say a short summary instead of reading every price. "
-          "The [[show:...]] product tag is never spoken (it is removed before speaking), so still add it whenever products are relevant.")
+          "The [[show:...]] and [[order:...]] tags are never spoken (they are removed before speaking), so still add them whenever they apply.")
 
 
 async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False, knowledge: str = "") -> str:
@@ -446,7 +473,7 @@ async def send_to_channel(conv: dict, text: str, s: Settings):
             logger.info("messenger send %s %s", r.status_code, r.text[:200])
 
 
-async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes], products: list):
+async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes], products: list, order: Optional[dict] = None):
     ch, to = conv["channel"], conv["external_id"]
     if ch == "web" or not ((ch == "telegram" and s.telegram_token) or (ch == "messenger" and s.fb_page_token)):
         return
@@ -483,6 +510,13 @@ async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes]
                 if texts:
                     r = await h.post(f"{base}/sendMessage", json={"chat_id": to, "text": "\n".join(texts)})
                     logger.info("telegram product text %s %s", r.status_code, r.text[:150])
+                if order:
+                    png, _ = await M.load_media(db, order["qr_media_id"])
+                    data = {"chat_id": to, "caption": khqr_caption(order)}
+                    if order.get("deeplink"):
+                        data["reply_markup"] = json.dumps({"inline_keyboard": [[{"text": "Pay with Bakong", "url": order["deeplink"]}]]})
+                    r = await h.post(f"{base}/sendPhoto", data=data, files={"photo": ("khqr.png", png, "image/png")})
+                    logger.info("telegram khqr %s %s", r.status_code, r.text[:150])
             else:
                 url, params = "https://graph.facebook.com/v21.0/me/messages", {"access_token": s.fb_page_token}
                 rcpt = json.dumps({"id": to})
@@ -498,6 +532,10 @@ async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes]
                     if img:
                         await attach("image", img, "product.jpg", doc["content_type"])
                     await send_to_channel(conv, f"{p['name']}" + (f" — {p['price']}" if p.get("price") else ""), s)
+                if order:
+                    png, _ = await M.load_media(db, order["qr_media_id"])
+                    await attach("image", png, "khqr.png", "image/png")
+                    await send_to_channel(conv, khqr_caption(order) + (f"\n{order['deeplink']}" if order.get("deeplink") else ""), s)
         except Exception as e:
             logger.exception("deliver failed: %s", e)
 
@@ -524,11 +562,15 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
         return None
     products = await load_products(bid)
     try:
-        reply, shown = split_show(await generate_reply(conv["id"], s, products, spoken=bool(audio and s.voice_replies),
-                                                       knowledge=await N.knowledge(db, bid)), products)
+        raw = await generate_reply(conv["id"], s, products, spoken=bool(audio and s.voice_replies), knowledge=await N.knowledge(db, bid))
     except Exception as e:
         logger.exception("AI reply failed: %s", e)
         return None
+    reply, shown = split_show(raw, products)
+    items = order_items(raw, products) if P.enabled(s) else []
+    order = await create_order(conv, s, items) if items else None
+    if items and not order:
+        reply += "\n\n" + (QR_FAIL["km"] if M.KHMER.search(reply) else QR_FAIL["en"])
     ratts, voice_mp3 = [], None
     if audio and s.voice_replies:
         try:
@@ -538,10 +580,181 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
         except Exception as e:
             logger.exception("voice reply failed: %s", e)
             voice_mp3 = None
-    ratts += [product_att(p) for p in shown]
+    ratts += [product_att(p) for p in shown] + ([khqr_att(order)] if order else [])
     msg = await add_message(conv, "ai", reply, ratts)
-    await deliver(conv, s, reply, voice_mp3, shown)
+    await deliver(conv, s, reply, voice_mp3, shown, order)
     return msg
+
+
+# ---------- Orders & Bakong KHQR ----------
+QR_FAIL = {"en": "(Sorry, the payment QR could not be created right now. Our team will send you the payment details.)",
+           "km": "(សូមអភ័យទោស មិនអាចបង្កើត QR ទូទាត់បានទេពេលនេះ។ ក្រុមការងាររបស់យើងនឹងផ្ញើព័ត៌មានទូទាត់ជូន។)"}
+PAID_MSG = {"en": "Payment received ✅ Thank you! Order {number} · {amount} is confirmed.",
+            "km": "បានទទួលការទូទាត់ ✅ សូមអរគុណ! ការកម្ម៉ង់ {number} · {amount} ត្រូវបានបញ្ជាក់។"}
+
+
+def khqr_caption(o: dict) -> str:
+    return f"Bakong KHQR · {P.fmt_amount(o['total'], o['currency'])} · Order {o['number']}\nScan with any bank app (ABA, ACLEDA, Wing, Bakong…) · valid {P.QR_MINUTES} min"
+
+
+def khqr_att(o: dict) -> dict:
+    return {"type": "khqr", "order_id": o["id"], "media_id": o["qr_media_id"], "number": o["number"], "total": o["total"],
+            "currency": o["currency"], "amount_text": P.fmt_amount(o["total"], o["currency"]), "expires_at": o["expires_at"],
+            "status": o["status"], "deeplink": o.get("deeplink")}
+
+
+async def set_att_status(order_ids: list, status: str):
+    if order_ids:
+        await db.messages.update_many({"attachments.order_id": {"$in": order_ids}}, {"$set": {"attachments.$[a].status": status}},
+                                      array_filters=[{"a.order_id": {"$in": order_ids}}])
+
+
+async def create_order(conv: dict, s: Settings, items: list) -> Optional[dict]:
+    lines, currency = [], None
+    for p, qty in items:
+        price = P.parse_price(p.get("price", ""))
+        if not price or (currency and price[1] != currency):
+            logger.warning("order skipped: price %r not usable (currency %s)", p.get("price"), currency)
+            return None
+        currency = price[1]
+        lines.append({"product_id": p["id"], "name": p["name"], "price": p.get("price", ""), "unit": price[0], "qty": qty,
+                      "total": round(price[0] * qty, 2)})
+    total = round(sum(x["total"] for x in lines), 2 if currency == "USD" else 0)
+    number = "RF-" + secrets.token_hex(3).upper()
+    try:
+        q = await P.make_qr(s, total, currency, number)
+    except Exception as e:
+        logger.warning("KHQR creation failed: %s", e)
+        return None
+    media = await M.save_media(db, conv["business_id"], q["png"], "image/png", "khqr")
+    stale = [o["id"] async for o in db.orders.find({"business_id": conv["business_id"], "conversation_id": conv["id"], "status": "pending"}, {"_id": 0, "id": 1})]
+    if stale:
+        await db.orders.update_many({"id": {"$in": stale}}, {"$set": {"status": "cancelled", "updated_at": now_iso()}})
+        await set_att_status(stale, "cancelled")
+    now = datetime.now(timezone.utc)
+    order = {"id": str(uuid.uuid4()), "business_id": conv["business_id"], "conversation_id": conv["id"], "channel": conv["channel"],
+             "customer": conv.get("name", ""), "number": number, "items": lines, "total": total, "currency": currency, "mode": q["mode"],
+             "qr": q["qr"], "md5": q["md5"], "deeplink": q["deeplink"], "qr_media_id": media["id"], "status": "pending",
+             "created_at": now.isoformat(), "expires_at": (now + timedelta(minutes=P.QR_MINUTES)).isoformat(), "paid_at": None, "paid_by": ""}
+    await db.orders.insert_one(dict(order))
+    return order
+
+
+async def settle_order(order: dict, by: str) -> bool:
+    if not await db.orders.find_one_and_update({"id": order["id"], "status": {"$ne": "paid"}},
+                                               {"$set": {"status": "paid", "paid_at": now_iso(), "paid_by": by, "updated_at": now_iso()}}):
+        return False
+    await set_att_status([order["id"]], "paid")
+    conv = await db.conversations.find_one({"id": order["conversation_id"]}, {"_id": 0})
+    if not conv:
+        return True
+    last = await db.messages.find_one({"conversation_id": conv["id"], "role": "user"}, {"_id": 0, "text": 1}, sort=[("created_at", -1)])
+    lang = "km" if last and M.KHMER.search(last.get("text", "")) else "en"
+    text = PAID_MSG[lang].format(number=order["number"], amount=P.fmt_amount(order["total"], order["currency"]))
+    await add_message(conv, "ai", text)
+    if conv["channel"] != "web":
+        try:
+            await send_to_channel(conv, text, await get_settings(order["business_id"]))
+        except Exception as e:
+            logger.warning("paid notice not delivered: %s", e)
+    return True
+
+
+async def expire_orders():
+    ids = [o["id"] async for o in db.orders.find({"status": "pending", "expires_at": {"$lt": now_iso()}}, {"_id": 0, "id": 1})]
+    if ids:
+        await db.orders.update_many({"id": {"$in": ids}, "status": "pending"}, {"$set": {"status": "expired", "updated_at": now_iso()}})
+        await set_att_status(ids, "expired")
+
+
+async def poll_relay(late: bool):
+    # Relay QRs stay payable for 1 day, so expired/replaced ones are re-checked once a minute for late payments.
+    flt = {"mode": "relay", "status": "pending"}
+    if late:
+        flt = {"mode": "relay", "status": {"$in": ["pending", "expired", "cancelled"]},
+               "created_at": {"$gt": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()}}
+    groups = {}
+    async for o in db.orders.find(flt, {"_id": 0, "qr": 0}):
+        groups.setdefault(o["business_id"], []).append(o)
+    sem = asyncio.Semaphore(5)
+
+    async def check(bid, orders):
+        async with sem:
+            token = (await get_settings(bid)).khqr_token
+            if not token.startswith(P.RELAY_PREFIX):
+                return
+            for i in range(0, len(orders), 50):
+                chunk = orders[i:i + 50]
+                try:
+                    paid = set(await P.bulk_paid(token, [o["md5"] for o in chunk]))
+                except P.PaymentError as e:
+                    logger.warning("KHQR.dev check failed for %s: %s", bid, e)
+                    return
+                for o in chunk:
+                    if o["md5"] in paid:
+                        await settle_order(o, "auto")
+    await asyncio.gather(*(check(b, os_) for b, os_ in groups.items()))
+
+
+async def payments_loop():
+    tick = 0
+    while True:
+        try:
+            await expire_orders()
+            await poll_relay(late=tick % 12 == 0)
+        except Exception as e:
+            logger.exception("payments loop: %s", e)
+        tick += 1
+        await asyncio.sleep(5)
+
+
+@api.get("/orders")
+async def list_orders(status: Optional[Literal["pending", "paid", "expired", "cancelled"]] = None, user=Depends(current_user)):
+    flt = {"business_id": user["business_id"], **({"status": status} if status else {})}
+    return await db.orders.find(flt, {"_id": 0, "qr": 0, "md5": 0}).sort("created_at", -1).to_list(300)
+
+
+async def own_order(oid: str, user: dict) -> dict:
+    o = await db.orders.find_one({"id": oid, "business_id": user["business_id"]}, {"_id": 0})
+    if not o:
+        raise HTTPException(404, "Order not found")
+    return o
+
+
+@api.post("/orders/{oid}/mark-paid")
+async def order_mark_paid(oid: str, user=Depends(current_user)):
+    o = await own_order(oid, user)
+    if o["status"] == "paid":
+        raise HTTPException(409, "This order is already paid")
+    await settle_order(o, f"seller:{user['email']}")
+    return await db.orders.find_one({"id": oid}, {"_id": 0, "qr": 0, "md5": 0})
+
+
+@api.post("/orders/{oid}/cancel")
+async def order_cancel(oid: str, user=Depends(current_user)):
+    o = await own_order(oid, user)
+    if o["status"] == "paid":
+        raise HTTPException(409, "Paid orders can't be cancelled")
+    await db.orders.update_one({"id": oid}, {"$set": {"status": "cancelled", "updated_at": now_iso()}})
+    await set_att_status([oid], "cancelled")
+    return await db.orders.find_one({"id": oid}, {"_id": 0, "qr": 0, "md5": 0})
+
+
+@api.post("/payments/preview")
+async def payments_preview(user=Depends(current_user)):
+    s = await get_settings(user["business_id"])
+    if not P.enabled(s):
+        raise HTTPException(400, "Add your Bakong account ID (or a KHQR.dev token) and press Save first")
+    if s.khqr_token:
+        ok, err = await P.token_ok(s.khqr_token)
+        if not ok:
+            raise HTTPException(400, f"KHQR.dev token problem: {err}")
+    try:
+        q = await P.make_qr(s, 1.0, "USD", "RF-TEST")
+    except Exception as e:
+        raise HTTPException(400, f"Could not create the QR: {e}")
+    media = await M.save_media(db, user["business_id"], q["png"], "image/png", "khqr")
+    return {"media_id": media["id"], "mode": q["mode"], "deeplink": q["deeplink"]}
 
 
 # ---------- Public (website widget) ----------
@@ -789,7 +1002,13 @@ async def ai_test(body: TestAIIn, user=Depends(current_user)):
     products = await load_products(user["business_id"])
     raw = await llm(s, system_prompt(s, products, await N.knowledge(db, user["business_id"])), f"Customer: {body.text}\n\nWrite the assistant's reply. Output only the reply text.")
     reply, shown = split_show(raw, products)
-    return {"reply": reply, "products": [product_att(p) for p in shown]}
+    items = order_items(raw, products) if P.enabled(s) else []
+    order = None
+    if items:
+        prices = [P.parse_price(p.get("price", "")) for p, _ in items]
+        if all(prices) and len({c for _, c in prices}) == 1:
+            order = P.fmt_amount(sum(a * q for (a, _), (_, q) in zip(prices, items)), prices[0][1])
+    return {"reply": reply, "products": [product_att(p) for p in shown], "order_total": order}
 
 
 # ---------- Media, products, voice ----------
@@ -1227,6 +1446,11 @@ async def startup():
     await db.notion_docs.create_index([("business_id", 1), ("notion_id", 1)], unique=True)
     await db.cron_runs.create_index("id", unique=True)
     await db.cron_runs.create_index("created", expireAfterSeconds=7 * 86400)
+    await db.orders.create_index("id", unique=True)
+    await db.orders.create_index([("business_id", 1), ("created_at", -1)])
+    await db.orders.create_index([("status", 1), ("mode", 1), ("expires_at", 1)])
+    await db.messages.create_index("attachments.order_id", sparse=True)
+    app.state.payments_task = asyncio.create_task(payments_loop())
     try:
         M.init_storage()
     except Exception as e:
