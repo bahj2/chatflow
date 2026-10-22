@@ -91,6 +91,16 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Telegram: 2–10 product photos sent as one album (sendMediaGroup) with captions; text fallback if album/photo fails. Product cards: 2-column grid (single card w-44)
 - iteration_13 + iteration_14 pass (100%)
 
+## Iteration 13 (2026-06) — Bakong KHQR payments
+- backend/payments.py (bakong-khqr 0.6.5): local dynamic KHQR from business Bakong account ID (tag 99 rewritten → QR truly expires in 10 min), styled KHQR PNG (2x), KHQR.dev relay (rbk token) for QR + automatic bulk payment check (NBC check API is Cambodia-IP only); parse_price ($→USD, ៛/riel/KHR→KHR)
+- AI tag [[order:ref*qty]] when customer confirms product+qty → db.orders {number RF-XXXXXXXX, items, total, currency, mode local|relay, md5, qr_media_id, status pending|paid|expired|cancelled, expires_at}; new order cancels older pending one in same chat; mixed currency / price range → AI reply regenerated with a system note (no QR promised)
+- Delivery: Telegram sendPhoto KHQR + caption (+ "Pay with Bakong" button when relay deeplink), Messenger image + caption, web KHQR card (status/expiry/deeplink)
+- payments_loop (5 s): expire pending orders, poll relay per business (bulk ≤50), late payments re-checked for 24 h every 60 s; settle_order atomic → "Payment received ✅" message (EN/KM)
+- Endpoints: GET /api/orders, POST /api/orders/{id}/mark-paid|cancel, POST /api/payments/preview; Settings: bakong_account_id, bakong_merchant_name, bakong_city, khqr_token
+- UI: Settings "Bakong KHQR payments" section, Orders page (nav), Inbox KHQR card with Mark paid (2-click for expired/cancelled), AI test shows order total
+- media.KHMER now letters only (excludes ៛/digits). iteration_15 + 16 pass; relay mode tested with MOCKED KHQR.dev only (no real rbk token)
+
+
 
 
 

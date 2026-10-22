@@ -1,5 +1,4 @@
 # Iteration 12: in-process check that /api/voice/test failure -> 424 JSON (HF demo forced to fail via monkeypatch)
-import os
 import sys
 import pytest
 from fastapi.testclient import TestClient

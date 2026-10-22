@@ -332,7 +332,10 @@ ASK_PHOTO = re.compile(r"\s*(would|do|shall|can) (you|i) (like|want|show)[^.?!]*
 def catalog_text(products: list, payments: bool = False) -> str:
     if not products:
         return ""
-    rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'} | {(p.get('description') or '')[:160]}" for p in products)
+    def pay_note(p):
+        pr = P.parse_price(p.get("price", ""))
+        return f" [{pr[1]}]" if pr else " [no exact price: cannot be paid by QR]"
+    rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'}{pay_note(p) if payments else ''} | {(p.get('description') or '')[:160]}" for p in products)
     return ("\n\nPRODUCT CATALOG (live and always up to date; it overrides anything said earlier in the conversation) (ref | name | price | description):\n" + rows +
             "\n\nProduct rules:\n"
             "- When the customer asks what you sell, about a product, prices or availability, answer right away from this catalog with product names and prices. "
@@ -422,9 +425,11 @@ SPOKEN = (" This reply will be SPOKEN as a voice message: write natural spoken s
           "The [[show:...]] and [[order:...]] tags are never spoken (they are removed before speaking), so still add them whenever they apply.")
 
 
-async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False, knowledge: str = "") -> str:
+async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False, knowledge: str = "", note: str = "") -> str:
     t = await transcript(conv_id)
     prompt = f"Conversation so far:\n{t}\n\nWrite the assistant's next reply to the customer.{SPOKEN if spoken else ''} Output only the reply text."
+    if note:
+        prompt += f"\n\nSYSTEM NOTE: {note}"
     for attempt in range(3):
         try:
             return await llm(s, system_prompt(s, products, knowledge), prompt)
@@ -569,6 +574,16 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
         return None
     reply, shown = split_show(raw, products)
     items = order_items(raw, products) if P.enabled(s) else []
+    problem = order_problem(items) if items else ""
+    if problem:
+        items = []
+        note = (f"No payment QR can be sent because {problem}. Rewrite your reply for this: do not say that a QR or payment code "
+                "is being sent, and add no [[order]] tag.")
+        try:
+            raw = await generate_reply(conv["id"], s, products, spoken=bool(audio and s.voice_replies), knowledge=await N.knowledge(db, bid), note=note)
+            reply, shown = split_show(raw, products)
+        except Exception as e:
+            logger.warning("order-problem rewrite failed: %s", e)
     order = await create_order(conv, s, items) if items else None
     if items and not order:
         reply += "\n\n" + (QR_FAIL["km"] if M.KHMER.search(reply) else QR_FAIL["en"])
@@ -608,6 +623,15 @@ async def set_att_status(order_ids: list, status: str):
     if order_ids:
         await db.messages.update_many({"attachments.order_id": {"$in": order_ids}}, {"$set": {"attachments.$[a].status": status}},
                                       array_filters=[{"a.order_id": {"$in": order_ids}}])
+
+
+def order_problem(items: list) -> str:
+    prices = [P.parse_price(p.get("price", "")) for p, _ in items]
+    if not all(prices):
+        return "some of these products have no single exact price (e.g. a price range), so a team member must confirm the price first"
+    if len({c for _, c in prices}) > 1:
+        return "the products are priced in different currencies (USD and KHR); ask the customer to order the USD and the KHR products separately"
+    return ""
 
 
 async def create_order(conv: dict, s: Settings, items: list) -> Optional[dict]:

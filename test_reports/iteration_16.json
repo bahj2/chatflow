@@ -1,0 +1,24 @@
+{
+  "summary": "Short retest of the KHQR follow-up fixes. Unit (6/6 new + 9/9 iter15 regression): M.KHMER no longer matches '15,000៛' or Khmer digits but still matches Khmer letters. M.speak sends Khmer text to voxcpm2-hf and English text with ៛ to openai (hf_voxcpm and TTS were monkeypatched). PAID_MSG is English when the English user message contains ៛ and Khmer for a Khmer message. handle_incoming with a mocked LLM reply 'Your total is $2.5 + 15,000៛ [[order:...]]' gets the English QR_FAIL line and a Khmer reply gets the Khmer one, with no order created. Order numbers match RF-[0-9A-F]{8}. Live (7/7 assertions): unique index business_id_1_number_1 exists. Widget 'I want to buy 2 Iced Palm Sugar Latte' gives a pending $5.00 khqr (RF-8hex), and mark-paid sends the 'Payment received' message. An English KHR order with '15,000៛' in the message, once marked paid, gets the ENGLISH 'Payment received' message. Prompt rule sampled on 4 live replies (2 mixed USD+KHR, 2 range '10-15$'): no QR is sent and the fallback line is English, BUT the AI still claimed a QR was being sent in 4/4 replies (100%). UI: Orders page: an expired order needs 2 clicks (text changes to 'Really received? Click again' and reverts after about 4 s, the 2nd click marks it paid). A pending order is marked paid in 1 click. Inbox KHQR card on a cancelled order: the 1st click shows the confirm text, the 2nd click marks it paid, the card shows 'Paid — thank you!' and the Payment received message appears.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "catalog_text PAYMENT rule (server.py ~346-352)", "issue": "Prompt rule is ignored 4/4 times. Mixed carts: 'Your total is $17.50. I'm sending you a Bakong KHQR code now' (the total is also wrong: it should be $2.5 + 15,000៛), and 'Your total is $35,000៛ ($5 + 30,000៛). A Bakong KHQR code is on its way'. Range: 'That's 10-15$ ... I'll send you a Bakong KHQR payment QR now', and '2 TEST Mystery Box for $20-30 total. I'm sending you a Bakong KHQR code now'. Each reply then ends with the English QR_FAIL line, which contradicts it."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter16_khqr_fixes_unit.py", "/app/backend/tests/test_iter16_khqr_fixes_live.py", "/app/backend/tests/seed_iter16_ui.py", "/app/test_reports/pytest/iter16_unit.xml", "/app/test_reports/pytest/iter16_live.xml"],
+  "action_items": [
+    "A prompt-only rule does not stop the model from promising a QR. Enforce it in code. Options: (a) in catalog_text, tag products whose price P.parse_price can't parse as 'no QR — team confirms price' and list each product's currency; (b) better: in handle_incoming, when items exist but create_order fails on a price/currency problem, drop the model's QR sentences or regenerate once with a system note ('order can't be created: mixed currency / price range — ask to order separately / say team confirms price'), and use a specific fallback line instead of 'could not be created right now'."
+  ],
+  "critical_code_review_comments": [
+    "create_order: insert_one with the new unique (business_id, number) index raises DuplicateKeyError on a collision (negligible with 8 hex chars), and that would surface as an AI reply failure. Consider one retry.",
+    "create_order returns None for both 'bad price/currency' and 'relay down', so the fallback text can't tell them apart ('right now' is misleading for a range price)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter16_khqr_fixes_unit.py", "/app/backend/tests/test_iter16_khqr_fixes_live.py", "/app/backend/tests/seed_iter16_ui.py"],
+  "success_rate": {"backend": "100% of fix checks (22/22: 6 unit + 9 iter15 unit regression + 7 live); prompt rule behaviour 0/4", "frontend": "100%"},
+  "seed_data_creation": "None kept. Cleaned up 9 TEST_ conversations, 23 messages, 5 orders and 2 TEST products in loadtest. Latte product and bakong settings are intact (sambath@aclb, khqr_token ''). Unit TEST_biz_khqr16_* data was removed. Admin business not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Unit: cd /app/backend && set -a; . ./.env; set +a; pytest tests/test_iter16_khqr_fixes_unit.py -p no:cacheprovider -n 0. Live: pytest tests/test_iter16_khqr_fixes_live.py -n 0 -s (6 LLM chats; prints RESULTS with claims_qr per case. The QR_CLAIM regex misses phrasings like 'on its way', so read the printed text). UI seed: python3 tests/seed_iter16_ui.py prints pending/expired/cancelled order numbers. Clean up by deleting conversations named ^TEST_ in bid 4f0dbc25... plus their orders and messages."
+}

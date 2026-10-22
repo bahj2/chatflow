@@ -1,5 +1,4 @@
 # Iteration 10: Notion knowledge feature (connect/sync/disconnect, cron, isolation, AI usage)
-import os
 import re
 import subprocess
 import time

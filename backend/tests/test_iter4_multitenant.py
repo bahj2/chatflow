@@ -92,7 +92,7 @@ class TestSignup:
 class TestIsolation:
     def test_isolation_full(self, two_biz):
         a, b = two_biz["a"], two_biz["b"]
-        bida, bidb = a["user"]["business_id"], b["user"]["business_id"]
+        _bida, bidb = a["user"]["business_id"], b["user"]["business_id"]
         # turn off auto reply on both to avoid LLM
         for t in (a, b):
             s = requests.get(f"{API}/settings", headers=hdr(t["token"])).json()

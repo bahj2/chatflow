@@ -119,7 +119,7 @@ class TestSellerVoiceFlow:
         assert r.status_code == 200
         assert r.json()["seller_voice_media_id"] == orig
         after = requests.get(f"{API}/settings", headers=H(other), timeout=30).json()["seller_voice_media_id"]
-        assert after == orig, f"PUT /settings accepted another tenant's seller_voice_media_id"
+        assert after == orig, "PUT /settings accepted another tenant's seller_voice_media_id"
 
     def test_stale_save_keeps_sample_and_text_editable(self, admin):
         s = requests.get(f"{API}/settings", headers=H(admin), timeout=30).json()
