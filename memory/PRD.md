@@ -85,6 +85,13 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Website widget voice is now async: POST /public/{bid}/voice → {accepted, ai_reply}; widget polls every 2 s up to 90 s
 - iteration_11 + iteration_12 pass (100%)
 
+## Iteration 12 (2026-06) — AI uses new products directly
+- Bug: after adding a product the AI still said "team will contact you" (history bias from earlier "no product info" replies + SPOKEN "no symbols" rule dropped the [[show]] tag → no photos with voice replies)
+- Fix: catalog_text marks catalog as live/overriding earlier replies, answer directly with name+price, never defer when catalog answers; specific question → up to 3 matches, general "what do you sell?" → ALL products (max 10); SPOKEN keeps the show tag; split_show cap 10 + strips markdown (**, #, list markers → •)
+- Telegram: 2–10 product photos sent as one album (sendMediaGroup) with captions; text fallback if album/photo fails. Product cards: 2-column grid (single card w-44)
+- iteration_13 + iteration_14 pass (100%)
+
+
 
 
 

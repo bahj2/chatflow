@@ -314,7 +314,7 @@ TONES = {
 
 
 SHOW_TAG = re.compile(r"\[\[show:([^\]]*)\]\]", re.I)
-MARKDOWN = re.compile(r"\*\*|__|^#{1,6}\s+|^\s*[*-]\s+(?=\S)", re.M)
+MARKDOWN = re.compile(r"\*\*|__|^#{1,6}[ \t]+|^[ \t]*[*-][ \t]+(?=\S)", re.M)
 ASK_PHOTO = re.compile(r"\s*(would|do|shall|can) (you|i) (like|want|show)[^.?!]*\b(see|photo|picture|image|look)[^.?!]*\?\s*$", re.I)
 
 
@@ -471,6 +471,8 @@ async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes]
                     cap, img, ct = photos[0]
                     r = await h.post(f"{base}/sendPhoto", data={"chat_id": to, "caption": cap}, files={"photo": ("product.jpg", img, ct)})
                     logger.info("telegram product %s %s", r.status_code, r.text[:150])
+                    if r.status_code != 200:
+                        texts = [cap] + texts
                 elif photos:  # album of up to 10 photos, each with its own caption
                     media = [{"type": "photo", "media": f"attach://p{i}", "caption": cap} for i, (cap, _, _) in enumerate(photos)]
                     files = {f"p{i}": (f"product{i}.jpg", img, ct) for i, (_, img, ct) in enumerate(photos)}

@@ -1,0 +1,34 @@
+{
+  "summary": "Short retest of iteration 13's 3 minor follow-ups. (1) Markdown stripping: unit tests of split_show pass. It removes **, __ and '# ' headings, and turns '* ' or '- ' at line start into '• '. Text mid-line ('10-15$', '3 * 2', 'Price - 5$', 'C# #1', '-5$', '*note') is left as is. catalog_text has the no-markdown rule. Live LLM tests on the loadtest business with 6 products passed 4/4: 'What do you sell?', 'បងលក់អ្វីខ្លះ?', 'list all products with prices' and /api/ai/test. No reply had **, [[show or markdown list markers, and every reply had at least 5 of the 6 products attached. (2) Telegram album fallback: with httpx mocked, when sendMediaGroup returns 400 or 500 the photo captions are sent as one sendMessage, with the captions of products without images added after them (P0 — 0$\\nP1 — 1$\\nT0\\nT1). This also works with voice. A 200 album sends no fallback. The iteration 13 deliver unit tests still pass (15/15 unit tests in total). (3) Product cards UI checked with Playwright in the Embed widget, Settings AI test box and Inbox, at 1920 and 390 widths, with 6 products and with 1 product. Cards show in a 2-column grid with square images (170px, or 148px in Settings at 390). Page width overflow is 0 everywhere, no element sticks out to the right, and names/prices are readable. Products without an image show the ImageOff placeholder. Cleanup: loadtest products deleted (0 left) and TEST_/UI web conversations deleted. Admin's Gemini Pro was not touched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "split_show MARKDOWN regex", "issue": "With re.M, '^\\s*[*-]\\s+' can also match newlines, so it removes the blank line before a list: 'Here you go:\\n\\n- A' becomes 'Here you go:\\n• A'. It also removes the indentation of nested items. Only cosmetic. Fix: use '^[ \\t]*[*-][ \\t]+(?=\\S)'."},
+      {"endpoint": "deliver() telegram", "issue": "Only a non-200 sendMediaGroup has a fallback. If a single-product sendPhoto fails, or an httpx exception happens during the album, the product name/price is never sent (the exception goes to the outer except). Low priority."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inbox (AI reply on the right)", "issues": ["The product grid is a fixed w-[22rem] box inside a justify-end row, so 1 product card sits in the left column of that box. It does not line up with the right edge of the AI bubble (at 1920: card right edge 1159px vs bubble 1306px). Consider justify-items-end / 'ml-auto' for single cards, or grid-cols-1 w-44 when products.length===1."},
+      {"screen": "Embed / Inbox at 390px", "issues": ["6 products fill about 700px of height (3 rows of 220px cards). Fine, but smaller cards or a horizontal scroll row would make long catalogs easier to read on phones. Optional."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter14_markdown_album_unit.py", "/app/backend/tests/test_iter14_markdown_live.py", "/app/backend/tests/test_iter13_deliver_unit.py", "/app/test_reports/pytest/iter14_unit.xml", "/app/test_reports/pytest/iter14_live.xml"],
+  "action_items": [
+    "Optional: change MARKDOWN list pattern to '^[ \\t]*[*-][ \\t]+(?=\\S)' so blank lines before lists are kept",
+    "Optional: add a text fallback when single sendPhoto fails or the album request raises",
+    "Optional: align single product card to the right under AI bubbles in Inbox"
+  ],
+  "critical_code_review_comments": [
+    "MARKDOWN regex '\\s*' after '^' with re.M crosses line breaks (see minor issue)",
+    "deliver(): no fallback for sendPhoto failure or exception paths"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter14_markdown_album_unit.py", "/app/backend/tests/test_iter14_markdown_live.py"],
+  "success_rate": {"backend": "100% (15/15 unit, 4/4 live)", "frontend": "100% (6/6 view x width checks)"},
+  "seed_data_creation": "6 products created in the loadtest business for testing; all deleted afterwards. TEST_md_* and the 2 Playwright embed web conversations deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Loadtest bid 4f0dbc25-7fad-40f4-b898-0ef8db1d9799; embed URL /embed?b=<bid>. To seed 6 products and keep them: run test_iter14_markdown_live.py with KEEP_PRODUCTS=1. To clean up: cleanup_iter13.py, but it misses Playwright embed conversations whose last_message has no CapCut/premium, so also delete loadtest web conversations by created_at. Selectors: chat-msg-ai-product, ai-test-product, message-ai-product."
+}

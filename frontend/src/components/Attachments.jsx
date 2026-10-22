@@ -26,7 +26,7 @@ export const Attachments = ({ atts = [], prefix }) => {
     <div className="space-y-2">
       {audio.map((a, i) => <AudioAtt key={i} a={a} testid={`${prefix}-audio`} />)}
       {products.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 w-[22rem] max-w-full">{products.map((p) => <ProductCard key={p.product_id} p={p} testid={`${prefix}-product`} />)}</div>
+        <div className={`grid gap-2 max-w-full ${products.length === 1 ? "grid-cols-1 w-44" : "grid-cols-2 w-[22rem]"}`}>{products.map((p) => <ProductCard key={p.product_id} p={p} testid={`${prefix}-product`} />)}</div>
       )}
     </div>
   );
