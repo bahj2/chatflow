@@ -321,11 +321,15 @@ def catalog_text(products: list) -> str:
     if not products:
         return ""
     rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'} | {(p.get('description') or '')[:160]}" for p in products)
-    return ("\n\nPRODUCT CATALOG (ref | name | price | description):\n" + rows +
-            "\n\nWhen the customer asks about products, prices or availability, or seeing a product would clearly help, "
-            "mention the product name and price in your reply and END your reply with a tag like [[show:ref1,ref2]] "
-            "listing up to 3 refs from the catalog that best match (only refs that exist). The product photos are sent automatically "
-            "with your reply, so never ask whether they want to see a photo. Otherwise add no tag.")
+    return ("\n\nPRODUCT CATALOG (live and always up to date; it overrides anything said earlier in the conversation) (ref | name | price | description):\n" + rows +
+            "\n\nProduct rules:\n"
+            "- When the customer asks what you sell, about a product, prices or availability, answer right away from this catalog with product names and prices. "
+            "Never say a team member will follow up or that you have no product details when the catalog answers it, even if earlier assistant messages said so.\n"
+            "- END that reply with a tag like [[show:ref1,ref2]] using only refs that exist. Product photos with name and price are sent automatically "
+            "with your reply, so never ask whether they want to see a photo.\n"
+            "- Specific question (one product, type, budget): tag up to 3 best matches. General question (\"what do you sell?\", \"show me your products\"): "
+            "briefly name what you have and tag ALL products (max 10).\n"
+            "- If the message is not about products, add no tag.")
 
 
 def split_show(text: str, products: list) -> tuple:
@@ -333,7 +337,7 @@ def split_show(text: str, products: list) -> tuple:
     clean = SHOW_TAG.sub("", text).strip()
     picked = [p for r in refs for p in products if p["id"].startswith(r)]
     seen = set()
-    picked = [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:3]
+    picked = [p for p in picked if not (p["id"] in seen or seen.add(p["id"]))][:10]
     if picked:
         clean = ASK_PHOTO.sub("", clean).strip()
     return clean, picked
@@ -358,7 +362,7 @@ def system_prompt(s: Settings, products: Optional[list] = None, knowledge: str =
         f"Business information:\n{s.business_info or '(not provided)'}\n\nFAQs:\n{faqs}\n\n{notion_text(knowledge)}"
         f"Style: {TONES.get(s.tone, TONES['friendly'])}. Keep replies short (1-3 sentences), clear and easy to read on a phone. "
         f"Understand what the customer really wants, answer it directly, and suggest a next step when helpful. {lang} "
-        "Only use the business information, FAQs, Notion knowledge and product catalog for facts like prices, hours or policies; if you don't know, say a team member will follow up. "
+        "Only use the business information, FAQs, Notion knowledge and product catalog for facts like prices, hours or policies; only for facts none of them cover, say a team member will follow up. "
         "Never mention you are an AI model name. Plain text only, no markdown."
         + catalog_text(products or [])
     )
@@ -384,7 +388,8 @@ async def transcript(conv_id: str, limit: int = 20) -> str:
 
 SPOKEN = (" This reply will be SPOKEN as a voice message: write natural spoken sentences only, no emoji, no symbols like $ % or /, "
           "write prices and numbers as words in the customer's language (e.g. in Khmer 'បីដុល្លារកន្លះ'), and never mix in English words when replying in another language "
-          "(translate or transliterate product terms, e.g. 'gluten' -> 'ស្អិត').")
+          "(translate or transliterate product terms, e.g. 'gluten' -> 'ស្អិត'). If you show several products, say a short summary instead of reading every price. "
+          "The [[show:...]] product tag is never spoken (it is removed before speaking), so still add it whenever products are relevant.")
 
 
 async def generate_reply(conv_id: str, s: Settings, products: list, spoken: bool = False, knowledge: str = "") -> str:
@@ -452,14 +457,26 @@ async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes]
                 if voice_mp3 is not None:
                     r = await h.post(f"{base}/sendVoice", data={"chat_id": to}, files={"voice": ("reply.mp3", voice_mp3, "audio/mpeg")})
                     logger.info("telegram voice %s %s", r.status_code, r.text[:150])
+                photos, texts = [], []
                 for p in products:
                     cap = f"{p['name']}" + (f" — {p['price']}" if p.get("price") else "")
                     img, doc = await M.load_media(db, p["image_media_id"]) if p.get("image_media_id") else (None, None)
                     if img:
-                        r = await h.post(f"{base}/sendPhoto", data={"chat_id": to, "caption": cap}, files={"photo": ("product.jpg", img, doc["content_type"])})
+                        photos.append((cap, img, doc["content_type"]))
                     else:
-                        r = await h.post(f"{base}/sendMessage", json={"chat_id": to, "text": cap})
+                        texts.append(cap)
+                if len(photos) == 1:
+                    cap, img, ct = photos[0]
+                    r = await h.post(f"{base}/sendPhoto", data={"chat_id": to, "caption": cap}, files={"photo": ("product.jpg", img, ct)})
                     logger.info("telegram product %s %s", r.status_code, r.text[:150])
+                elif photos:  # album of up to 10 photos, each with its own caption
+                    media = [{"type": "photo", "media": f"attach://p{i}", "caption": cap} for i, (cap, _, _) in enumerate(photos)]
+                    files = {f"p{i}": (f"product{i}.jpg", img, ct) for i, (_, img, ct) in enumerate(photos)}
+                    r = await h.post(f"{base}/sendMediaGroup", data={"chat_id": to, "media": json.dumps(media)}, files=files)
+                    logger.info("telegram products album %s %s", r.status_code, r.text[:150])
+                if texts:
+                    r = await h.post(f"{base}/sendMessage", json={"chat_id": to, "text": "\n".join(texts)})
+                    logger.info("telegram product text %s %s", r.status_code, r.text[:150])
             else:
                 url, params = "https://graph.facebook.com/v21.0/me/messages", {"access_token": s.fb_page_token}
                 rcpt = json.dumps({"id": to})
