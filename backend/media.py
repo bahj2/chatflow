@@ -6,11 +6,11 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 import uuid
 import wave
 from datetime import datetime, timezone
 
-import edge_tts
 import httpx
 import imageio_ffmpeg
 import requests
@@ -24,7 +24,6 @@ APP_NAME = "replyflow"
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 KHMER = re.compile(r"[\u1780-\u17D3]")  # Khmer letters/signs only (not ៛ or digits)
 VOICES = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]
-KM_VOICES = {"sreymom": "km-KH-SreymomNeural", "piseth": "km-KH-PisethNeural"}
 EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]")
 _storage_key = None
 
@@ -127,29 +126,6 @@ async def transcribe(mp3: bytes) -> str:
         return await whisper_transcribe(mp3)
 
 
-async def microsoft_khmer(text: str, voice: str) -> bytes:
-    out = b""
-    async for chunk in edge_tts.Communicate(text, KM_VOICES.get(voice, KM_VOICES["sreymom"])).stream():
-        if chunk["type"] == "audio":
-            out += chunk["data"]
-    if not out:
-        raise RuntimeError("empty audio")
-    return out
-
-
-async def voxcpm_tts(s, text: str, ref_wav: bytes) -> bytes:
-    body = {"model": "openbmb/VoxCPM2", "input": text, "response_format": "wav"}
-    if ref_wav:
-        body["ref_audio"] = "data:audio/wav;base64," + base64.b64encode(ref_wav).decode()
-        if s.seller_voice_text:
-            body["ref_text"] = s.seller_voice_text
-    headers = {"Authorization": f"Bearer {s.voxcpm_key}"} if s.voxcpm_key else {}
-    async with httpx.AsyncClient(timeout=120) as h:
-        r = await h.post(f"{s.voxcpm_url.rstrip('/')}/v1/audio/speech", json=body, headers=headers)
-    r.raise_for_status()
-    return await to_mp3(r.content)
-
-
 HF_VOXCPM = "https://openbmb-voxcpm-demo.hf.space"
 HF_VOICE = "A warm, friendly young woman"
 HF_TIMEOUT = 60
@@ -158,6 +134,106 @@ HF_TIMEOUT = 60
 def wav_seconds(wav: bytes) -> float:
     with wave.open(io.BytesIO(wav)) as w:
         return w.getnframes() / float(w.getframerate())
+
+
+# ---------- Voice Creator Pro desktop app (seller's own computer, reached through a public tunnel link) ----------
+VCP_HEADERS = {"ngrok-skip-browser-warning": "1", "User-Agent": "ReplyFlow"}
+VCP_REF_MAX = 15  # the clone endpoint accepts 3-15 s of reference audio
+VCP_UNREACHABLE = ("Cannot reach Voice Creator Pro on your computer. Is the computer awake, the app open with HTTP API on, and the tunnel running? "
+                   "(Quick tunnel links change after every restart.)")
+
+
+class VcpError(Exception):
+    pass
+
+
+def _vcp_auth(key: str) -> dict:
+    return {**VCP_HEADERS, "X-API-Key": key}
+
+
+def _items(data, key: str) -> list:
+    if isinstance(data, dict):
+        data = data.get(key, data.get("items", data.get("data", [])))
+    return data if isinstance(data, list) else []
+
+
+def _find_audio(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, str) and "audio" in k.lower() and len(v) > 200:
+                return base64.b64decode(v.split(",", 1)[-1])
+        obj = [v for v in obj.values() if isinstance(v, (dict, list))]
+    for v in obj if isinstance(obj, list) else []:
+        if (a := _find_audio(v)):
+            return a
+    return None
+
+
+def _voxcpm_family(data) -> str:
+    models = data.get("models", data) if isinstance(data, dict) else data
+    if isinstance(models, dict):
+        models = [{"model_family": k, **(v if isinstance(v, dict) else {})} for k, v in models.items()]
+    for m in models if isinstance(models, list) else []:
+        if isinstance(m, str) and "voxcpm" in m.lower():
+            return m
+        if isinstance(m, dict) and "voxcpm" in json.dumps(m).lower():
+            return str(m.get("model_family") or m.get("family") or m.get("id") or m.get("name") or "")
+    return ""
+
+
+async def vcp_connect(url: str, key: str) -> dict:
+    """Checks the link really is Voice Creator Pro with an API key turned on; returns its saved voices and the VoxCPM2 model id."""
+    async with httpx.AsyncClient(timeout=25, headers=VCP_HEADERS) as h:
+        try:
+            r = await h.get(f"{url}/api/v1/health")
+        except httpx.HTTPError:
+            raise VcpError(VCP_UNREACHABLE)
+        if r.status_code >= 502:
+            raise VcpError(VCP_UNREACHABLE)
+        if r.status_code != 200 or "json" not in r.headers.get("content-type", ""):
+            raise VcpError('This link does not answer like Voice Creator Pro. Turn on "Enable HTTP API" in its Settings and point the tunnel to port 8100.')
+        if (await h.get(f"{url}/api/v1/voices")).status_code == 200:
+            raise VcpError("Set an API key in Voice Creator Pro → Settings first, so only ReplyFlow can use your computer.")
+        r = await h.get(f"{url}/api/v1/voices", headers=_vcp_auth(key))
+        if r.status_code in (401, 403):
+            raise VcpError("Wrong API key. Copy it again from Voice Creator Pro → Settings.")
+        if r.status_code != 200:
+            raise VcpError(f"Voice Creator Pro answered with error {r.status_code}.")
+        voices = [{"id": str(v.get("id") or v.get("voice_id")), "name": str(v.get("name") or v.get("id") or v.get("voice_id"))[:80]}
+                  for v in _items(r.json(), "voices") if isinstance(v, dict) and (v.get("id") or v.get("voice_id"))][:200]
+        try:
+            model = _voxcpm_family((await h.get(f"{url}/api/v1/models", headers=_vcp_auth(key))).json())
+        except (httpx.HTTPError, ValueError):
+            model = ""
+    return {"voices": voices, "model": model}
+
+
+async def vcp_speak(s, text: str, ref_wav: bytes = None, timeout: float = HF_TIMEOUT) -> bytes:
+    """Khmer speech from the seller's Voice Creator Pro: saved voice, else the ReplyFlow seller sample, else a designed default voice."""
+    body = {"target_text": text, "language": "Auto", **({"model_family": s.vcp_model} if s.vcp_model else {})}
+    if s.vcp_voice_id:
+        mode, body["voice_id"] = "clone", s.vcp_voice_id
+    elif ref_wav:
+        short = wav_seconds(ref_wav) <= VCP_REF_MAX
+        clip = ref_wav if short else await asyncio.to_thread(_ffmpeg, ref_wav, ["-t", str(VCP_REF_MAX), "wav"])
+        mode = "clone"
+        body.update(ref_audio_base64=base64.b64encode(clip).decode(), ref_text=s.seller_voice_text if short else "")
+    else:
+        mode, body["instruct_text"] = "design", HF_VOICE
+
+    async def run():
+        async with httpx.AsyncClient(timeout=timeout, headers=_vcp_auth(s.vcp_key)) as h:
+            r = await h.post(f"{s.vcp_url}/api/v1/generation/{mode}", params={"sync": "true"}, json=body)
+        if r.status_code in (401, 403):
+            raise VcpError("Voice Creator Pro refused the API key. Connect it again in Settings.")
+        r.raise_for_status()
+        if r.headers.get("content-type", "").startswith("audio/"):
+            return r.content
+        audio = _find_audio(r.json())
+        if not audio:
+            raise VcpError("Voice Creator Pro answered without audio.")
+        return audio
+    return await to_mp3(await asyncio.wait_for(run(), timeout))
 
 
 async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeout: float = HF_TIMEOUT) -> bytes:
@@ -190,16 +266,30 @@ async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeou
     return await to_mp3(await asyncio.wait_for(run(), timeout))
 
 
+async def seller_ref(db, s):
+    if not s.seller_voice_media_id:
+        return None
+    try:
+        return (await load_media(db, s.seller_voice_media_id))[0]
+    except Exception as e:
+        print(f"Seller voice sample unavailable, using default voice: {e}")
+        return None
+
+
 async def speak(db, s, text: str, timeout: float = HF_TIMEOUT) -> tuple:
-    """Returns (mp3_bytes, engine). Khmer uses only the HF VoxCPM2 demo and raises if it is down (caller sends text only)."""
+    """Returns (mp3_bytes, engine). Khmer: the seller's Voice Creator Pro first (if connected), then the free HF VoxCPM2 demo; raises if both fail (caller sends text only)."""
     text = EMOJI.sub("", text).strip()
     if KHMER.search(text):
-        ref = None
-        if s.seller_voice_media_id:
+        ref = await seller_ref(db, s)
+        if s.vcp_url:
+            t0 = time.monotonic()
             try:
-                ref, _ = await load_media(db, s.seller_voice_media_id)
+                return await vcp_speak(s, text, ref, timeout), "voxcpm2-vcp"
             except Exception as e:
-                print(f"Seller voice sample unavailable, using default voice: {e}")
+                print(f"Voice Creator Pro failed, trying the Hugging Face demo: {e!r}")
+            timeout -= time.monotonic() - t0
+            if timeout < 10:
+                raise RuntimeError("Voice Creator Pro took too long; no time left for the Hugging Face demo")
         if ref:
             return await hf_voxcpm(text, ref, s.seller_voice_text, timeout), "voxcpm2-hf-clone"
         return await hf_voxcpm(text, timeout=timeout), "voxcpm2-hf"
