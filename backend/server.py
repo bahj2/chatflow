@@ -95,11 +95,6 @@ class Settings(BaseModel):
     allowed_emails: List[str] = []
     voice_replies: bool = True
     voice: Literal["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"] = "nova"
-    vcp_url: str = ""
-    vcp_key: str = ""
-    vcp_model: str = ""
-    vcp_voice_id: str = ""
-    vcp_voices: List[dict] = []
     seller_voice_media_id: str = ""
     seller_voice_text: str = ""
     bakong_account_id: str = Field("", max_length=60)
@@ -135,7 +130,6 @@ class TestAIIn(BaseModel):
 class VoiceTestIn(BaseModel):
     text: str
     voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]] = None
-    only_vcp: bool = False
 
 
 # ---------- Auth ----------
@@ -280,24 +274,15 @@ async def get_settings(bid: str) -> Settings:
     return Settings(**(doc or {}))
 
 
-VCP_FIELDS = ("vcp_url", "vcp_key", "vcp_model", "vcp_voice_id", "vcp_voices")
-
-
-def settings_view(s: Settings) -> dict:
-    return s.model_dump(exclude={"vcp_key"})
-
-
 @api.get("/settings")
 async def read_settings(user=Depends(current_user)):
-    return settings_view(await get_settings(user["business_id"]))
+    return (await get_settings(user["business_id"])).model_dump()
 
 
 @api.put("/settings")
 async def write_settings(body: Settings, user=Depends(current_user)):
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
     cur = await get_settings(user["business_id"])
-    for k in VCP_FIELDS:  # only the /voice/vcp endpoints may change the Voice Creator Pro link
-        setattr(body, k, getattr(cur, k))
     if body.seller_voice_media_id != cur.seller_voice_media_id:
         body.seller_voice_text = cur.seller_voice_text  # stale tab: keep the transcript of the stored sample
     body.seller_voice_media_id = cur.seller_voice_media_id  # only /settings/seller-voice may change it
@@ -309,7 +294,7 @@ async def write_settings(body: Settings, user=Depends(current_user)):
         raise HTTPException(400, "KHQR.dev token must start with rbk")
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
-    return settings_view(body)
+    return body.model_dump()
 
 
 # ---------- AI ----------
@@ -1073,114 +1058,16 @@ async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
     s = await get_settings(user["business_id"])
     if body.voice:
         s = s.model_copy(update={"voice": body.voice})
-    text = M.EMOJI.sub("", body.text[:500]).strip()
     try:
-        if body.only_vcp:
-            if not s.vcp_url:
-                raise HTTPException(400, "Connect Voice Creator Pro first.")
-            ref = None if s.vcp_voice_id else await M.seller_ref(db, s)
-            audio, engine = await M.vcp_speak(s, text, ref, timeout=50), "voxcpm2-vcp"
-        else:
-            audio, engine = await M.speak(db, s, text, timeout=50)  # stay under the 60 s proxy limit
-    except HTTPException:
-        raise
+        audio, engine = await M.speak(db, s, body.text[:500], timeout=50)  # stay under the 60 s proxy limit
     except Exception as e:
         logger.warning("voice test failed: %r", e)
-        if body.only_vcp:
-            raise HTTPException(424, vcp_err(e))
-        if M.KHMER.search(text):
-            raise HTTPException(424, "The Khmer voice is busy or down right now (Voice Creator Pro and the free Hugging Face demo did not answer). "
+        if M.KHMER.search(body.text):
+            raise HTTPException(424, "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. "
                                      "Customers get the reply as text until it is back. Try again in a minute.")
         raise HTTPException(424, "Voice generation failed. Please try again.")
     doc = await M.save_media(db, user["business_id"], audio, "audio/mpeg", "voice_test")
     return {"media_id": doc["id"], "engine": engine}
-
-
-async def public_https(url: str) -> bool:
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-    u = urlparse(url)
-    if u.scheme != "https" or not u.hostname:
-        return False
-    try:
-        infos = await asyncio.get_running_loop().getaddrinfo(u.hostname, None)
-    except socket.gaierror:
-        return True  # unresolvable now; request will simply fail
-    return all(ipaddress.ip_address(i[4][0]).is_global for i in infos)
-
-
-# ---------- Voice Creator Pro (VoxCPM2 on the seller's own computer) ----------
-class VcpConnectIn(BaseModel):
-    url: str = Field(min_length=8, max_length=300)
-    key: str = Field(min_length=1, max_length=200)
-
-
-class VcpVoiceIn(BaseModel):
-    voice_id: str = Field("", max_length=120)
-
-
-def vcp_err(e: Exception) -> str:
-    if isinstance(e, M.VcpError):
-        return str(e)
-    if isinstance(e, (asyncio.TimeoutError, httpx.TimeoutException)):
-        return "Voice Creator Pro did not finish in time. Is the computer awake and not busy with another job?"
-    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code < 502:
-        return f"Voice Creator Pro answered with error {e.response.status_code}."
-    if isinstance(e, httpx.HTTPError):
-        return M.VCP_UNREACHABLE
-    return "Voice Creator Pro failed. Please try again."
-
-
-def vcp_view(s: Settings) -> dict:
-    return {"connected": bool(s.vcp_url), "url": s.vcp_url, "model": s.vcp_model, "voice_id": s.vcp_voice_id, "voices": s.vcp_voices}
-
-
-async def vcp_link(bid: str, url: str, key: str) -> dict:
-    if not rate_ok([(f"vcp:{bid}", 30, 3600)]):
-        raise HTTPException(429, "Too many tries. Please wait a few minutes.")
-    if not url.startswith("https://"):
-        raise HTTPException(400, "The link must start with https://")
-    if not await public_https(url):
-        raise HTTPException(400, "This link is not allowed (private or internal network).")
-    try:
-        info = await M.vcp_connect(url, key)
-    except Exception as e:
-        logger.warning("Voice Creator Pro connect failed: %r", e)
-        raise HTTPException(424, vcp_err(e))
-    s = await get_settings(bid)
-    keep = s.vcp_voice_id if any(v["id"] == s.vcp_voice_id for v in info["voices"]) else ""
-    upd = {"vcp_url": url, "vcp_key": key, "vcp_model": info["model"], "vcp_voices": info["voices"], "vcp_voice_id": keep}
-    await db.settings.update_one({"business_id": bid}, {"$set": upd})
-    return vcp_view(s.model_copy(update=upd))
-
-
-@api.post("/voice/vcp/connect")
-async def vcp_connect(body: VcpConnectIn, user=Depends(current_user)):
-    return await vcp_link(user["business_id"], body.url.strip().rstrip("/"), body.key.strip())
-
-
-@api.post("/voice/vcp/refresh")
-async def vcp_refresh(user=Depends(current_user)):
-    s = await get_settings(user["business_id"])
-    if not s.vcp_url:
-        raise HTTPException(400, "Connect Voice Creator Pro first.")
-    return await vcp_link(user["business_id"], s.vcp_url, s.vcp_key)
-
-
-@api.put("/voice/vcp/voice")
-async def vcp_voice(body: VcpVoiceIn, user=Depends(current_user)):
-    s = await get_settings(user["business_id"])
-    if body.voice_id and not any(v["id"] == body.voice_id for v in s.vcp_voices):
-        raise HTTPException(400, "Unknown voice. Press Refresh to load your Voice Creator Pro voices again.")
-    await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"vcp_voice_id": body.voice_id}})
-    return vcp_view(s.model_copy(update={"vcp_voice_id": body.voice_id}))
-
-
-@api.delete("/voice/vcp")
-async def vcp_disconnect(user=Depends(current_user)):
-    await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"vcp_url": "", "vcp_key": "", "vcp_model": "", "vcp_voice_id": "", "vcp_voices": []}})
-    return vcp_view(Settings())
 
 
 # ---------- Notion knowledge ----------

@@ -120,17 +120,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 
 
 
-## Iteration 16 (2026-06) — Voice Creator Pro (VoxCPM2) + no Microsoft voices
-- User: "voice clone using VoxCPM2 from voicecreator.pro, don't use Azure"; use the Voice Creator Pro API as an alternative to Hugging Face
-- Voice Creator Pro has NO cloud API: its HTTP API runs only inside the desktop app (http://127.0.0.1:8100, /api/v1/*, X-API-Key). Each business connects it through a public https tunnel (cloudflared quick tunnel) + the app's API key
-- media.py: vcp_connect (health JSON check, refuses VCP without an API key, wrong key, lists saved voices, detects VoxCPM2 model_family), vcp_speak (POST /api/v1/generation/clone?sync=true with voice_id, or the ReplyFlow seller sample trimmed to 15 s, else /generation/design "A warm, friendly young woman"); speak(): Khmer = VCP → HF VoxCPM2 demo → text, one 60 s budget
-- Endpoints: POST /api/voice/vcp/connect {url,key}, POST /api/voice/vcp/refresh, PUT /api/voice/vcp/voice {voice_id}, DELETE /api/voice/vcp; /api/voice/test {only_vcp}; vcp_key never returned; PUT /settings can't change vcp_* fields
-- UI: VcpConnect.jsx in AI Settings → Voice → Khmer voice card (steps, tunnel command, connect form, voice picker, Test, Refresh, Disconnect)
+## Iteration 16 (2026-06) — No Microsoft voices; Voice Creator Pro researched
+- User: "voice clone using VoxCPM2 from voicecreator.pro, don't use Azure"
 - Removed: edge-tts/Microsoft voices, khmer_voice setting, old Colab/Modal pairing endpoints + VoxAutoConnect.jsx + /voxcpm/*.py, voxcpm_pairs collection, Microsoft-voice preview video + clips
-- Demo video: user makes 7 clips in Voice Creator Pro and attaches them (import_voice_clips.py → make_demo_video.py), or once connected: scripts/gen_demo_voice_vcp.py OWNER_EMAIL [narrator=ID customer=ID shop=ID]
-- iteration_19 pass 100% with MOCKED VCP (scripts/mock_vcp.py behind a real cloudflared tunnel); NOT tested with the real desktop app
+- Voice Creator Pro: only the PAID desktop app ($54.99) has an HTTP API (localhost:8100); free Cloud accounts have none. A connect-your-computer integration was built + tested (iteration_19, mocked), then REMOVED at the user's request ("I need free")
+- Khmer live voice = free official HF VoxCPM2 demo only (down today: "Queue is stopped") → text-only replies when down (user default)
+- Free CPU copy ravuthz/VoxCPM-KM works (Khmer correct) but ~54 s for a 2-word phrase → not used
+- Demo video: user makes the 7 clips in their free Voice Creator Pro Cloud account and attaches them → scripts/import_voice_clips.py FILES → scripts/make_demo_video.py
 - Next (user-approved, after the video): split backend/server.py into routers (no behaviour change)
-
 
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling

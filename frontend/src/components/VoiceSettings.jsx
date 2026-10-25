@@ -3,7 +3,6 @@ import { Play, Loader2, Mic, Square, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/auth";
 import { mediaUrl } from "@/components/Attachments";
-import { VcpConnect } from "@/components/VcpConnect";
 import { useRecorder, blobName, clock } from "@/lib/recorder";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -12,10 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const VOICES = [["nova", "Nova — energetic"], ["shimmer", "Shimmer — bright"], ["coral", "Coral — warm"], ["alloy", "Alloy — neutral"], ["ash", "Ash — clear"],
   ["echo", "Echo — calm"], ["fable", "Fable — expressive"], ["onyx", "Onyx — deep"], ["sage", "Sage — measured"]];
 
-const ENGINES = { "voxcpm2-vcp": "VoxCPM2 · Voice Creator Pro", "voxcpm2-hf": "VoxCPM2 · default voice", "voxcpm2-hf-clone": "VoxCPM2 · seller voice clone", openai: "OpenAI" };
+const ENGINES = { "voxcpm2-hf": "VoxCPM2 · default voice", "voxcpm2-hf-clone": "VoxCPM2 · seller voice clone", openai: "OpenAI" };
 const MAX_SECONDS = 30;
 
-const BUSY_KM = "The Khmer voice is busy or down right now. Customers get the reply as text until it is back. Try again in a minute.";
+const BUSY_KM = "The free VoxCPM2 Khmer voice (Hugging Face demo) is busy or down right now. Customers get the reply as text until it is back. Try again in a minute.";
 
 const Preview = ({ text, label, testid, s }) => {
   const [busy, setBusy] = useState(false);
@@ -117,12 +116,11 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
       <div>
         <p className="font-medium text-sm">Khmer voice — VoxCPM2</p>
         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-          Khmer replies are spoken by VoxCPM2: first by your own Voice Creator Pro (if connected below), otherwise by the free official Hugging Face demo, in the seller’s own voice if a sample is added below, or else a warm, friendly young woman’s voice.
-          If no voice is ready within 60 seconds, customers get the reply as text instead.
+          Khmer replies are spoken by VoxCPM2 through its free official Hugging Face demo, in the seller’s own voice if a sample is added below, otherwise a warm, friendly young woman’s voice.
+          If the demo is busy or down (no answer within 60 seconds), customers get the reply as text instead.
         </p>
       </div>
       <Preview s={s} text="សួស្តីបង! អរគុណដែលបានទាក់ទងមកហាងយើងខ្ញុំ។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice" testid="khmer-preview-btn" />
-      <VcpConnect s={s} setS={setS} />
       <SellerVoice s={s} setS={setS} />
     </div>
   </Section>
