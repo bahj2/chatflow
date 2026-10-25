@@ -159,7 +159,8 @@ const useScript = (timeline) => {
       if (step.note) { setNote(step.note); setTimeout(() => run.current === id && setNote((n) => (n === step.note ? null : n)), 2300); }
       if (step.msg) {
         const idx = count++;
-        setMsgs((m) => [...m, step.msg]);
+        const real = step.msg.voice && timeline[step.msg.voice];
+        setMsgs((m) => [...m, real ? { ...step.msg, dur: Math.max(1, Math.round(real)) } : step.msg]);
         if (step.play) {
           setPlaying(idx);
           if (VIDEO) { cue(step.msg.voice); await sleep((timeline[step.msg.voice] || step.msg.dur) * 1000 + 250); } else await playAudio(VOICE(step.msg.voice), step.msg.dur);

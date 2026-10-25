@@ -134,8 +134,8 @@ def wav_seconds(wav: bytes) -> float:
         return w.getnframes() / float(w.getframerate())
 
 
-async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeout: float = HF_TIMEOUT) -> bytes:
-    """Khmer speech from the free official VoxCPM2 Hugging Face demo: seller-voice clone if a sample is given, else the default voice."""
+async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeout: float = HF_TIMEOUT, voice: str = HF_VOICE) -> bytes:
+    """Khmer speech from the free official VoxCPM2 Hugging Face demo: seller-voice clone if a sample is given, else a designed voice."""
     async def run():
         async with httpx.AsyncClient(timeout=timeout) as h:
             ref, clone_text = None, ""
@@ -143,7 +143,7 @@ async def hf_voxcpm(text: str, ref_wav: bytes = None, ref_text: str = "", timeou
                 up = await h.post(f"{HF_VOXCPM}/gradio_api/upload", files={"files": ("seller.wav", ref_wav, "audio/wav")})
                 up.raise_for_status()
                 ref, clone_text = {"path": up.json()[0], "meta": {"_type": "gradio.FileData"}}, ref_text.strip()
-            data = [text, "" if ref else HF_VOICE, ref, bool(clone_text), clone_text, 2.0, False, False]
+            data = [text, "" if ref else voice, ref, bool(clone_text), clone_text, 2.0, False, False]
             r = await h.post(f"{HF_VOXCPM}/gradio_api/call/generate", json={"data": data})
             r.raise_for_status()
             eid, event = r.json()["event_id"], None

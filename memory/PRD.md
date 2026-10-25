@@ -126,7 +126,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Voice Creator Pro: only the PAID desktop app ($54.99) has an HTTP API (localhost:8100); free Cloud accounts have none. A connect-your-computer integration was built + tested (iteration_19, mocked), then REMOVED at the user's request ("I need free")
 - Khmer live voice = free official HF VoxCPM2 demo only (down today: "Queue is stopped") → text-only replies when down (user default)
 - Free CPU copy ravuthz/VoxCPM-KM works (Khmer correct) but ~54 s for a 2-word phrase → not used
-- Demo video: user makes the 7 clips in their free Voice Creator Pro Cloud account and attaches them → scripts/import_voice_clips.py FILES → scripts/make_demo_video.py
+- HF VoxCPM2 demo back up (2026-06): live Khmer seller-clone voice test OK in 2.4 s
+- Demo video DONE with VoxCPM2 voices only: scripts/gen_demo_voice_hf.py (narrator = energetic young man, customer = cheerful young woman, seller = app default warm young woman; first clip of each voice reused as clone ref; each clip transcribed back + retried) → scripts/make_demo_video.py → /demo/replyflow-demo.mp4 (1080x1920, 54.8 s)
+- Demo.jsx: voice-note bubble shows the real clip length from timeline.json
+- User's own clips can still replace them: scripts/import_voice_clips.py FILES → make_demo_video.py
 - Next (user-approved, after the video): split backend/server.py into routers (no behaviour change)
 
 ## Backlog
