@@ -12,11 +12,9 @@ const SCRIPT = [
   { wait: 200, note: [Images, "បង្ហាញរូបទំនិញដោយស្វ័យប្រវត្តិ"] },
   { wait: 1100, typing: 1500 },
   { msg: { from: "bot", text: "មានបង! ទំហំ M នៅមានស្តុកទាំងពីរម៉ូដ។ អាវយឺតកប្បាស 8$ និងអាវយឺតធំទូលាយ 10$ ។ បងចូលចិត្តមួយណាដែរ?", t: "23:04" } },
-  { wait: 2800, msg: { from: "me", voice: "/demo/customer-voice.mp3", dur: 3, t: "23:05" }, play: true },
-  { wait: 0, note: [Mic, "ស្ដាប់យល់សារជាសំឡេងខ្មែរ"] },
+  { wait: 2800, msg: { from: "me", voice: "/demo/customer-voice.mp3", dur: 3, t: "23:05" }, play: true, note: [Mic, "ស្ដាប់យល់សារជាសំឡេងខ្មែរ"] },
   { wait: 300, typing: 1800, recording: true },
-  { msg: { from: "bot", voice: "/demo/bot-voice.mp3", dur: 7, t: "23:05" }, play: true },
-  { wait: 0, note: [Volume2, "ឆ្លើយតបវិញជាសំឡេង"] },
+  { msg: { from: "bot", voice: "/demo/bot-voice.mp3", dur: 7, t: "23:05" }, play: true, note: [Volume2, "ឆ្លើយតបវិញជាសំឡេង"] },
   { wait: 300, msg: { from: "bot", text: "ចាស បង! អាវយឺតកប្បាសពណ៌ស ទំហំ M × ២ សរុប 16$ ។ សូមស្កេន KHQR ខាងក្រោម ដើម្បីទូទាត់។", t: "23:05" } },
   { wait: 1000, msg: { from: "bot", khqr: "/demo/khqr-16.png", caption: "KHQR · 16$ · ស្កេនបានក្នុងរយៈពេល ១០ នាទី", t: "23:05" } },
   { wait: 200, note: [QrCode, "ផ្ញើ KHQR តាមចំនួនទឹកប្រាក់ពិតប្រាកដ"] },
@@ -57,7 +55,7 @@ const Bubble = ({ m, playing }) => {
     <div className={`flex ${me ? "justify-end" : ""} demo-pop`} data-testid={`demo-msg-${me ? "me" : "bot"}`}>
       <div className={`${m.khqr ? "w-[58%]" : media ? "w-[78%]" : "max-w-[82%]"} rounded-2xl ${me ? "rounded-br-md bg-[#2B5278]" : "rounded-bl-md bg-[#182533]"} overflow-hidden text-[14px] leading-relaxed text-white`}>
         {m.album && <div className="grid grid-cols-2 gap-0.5">{m.album.map((src) => <img key={src} src={src} alt="" className="h-36 w-full object-cover" />)}</div>}
-        {m.khqr && <img src={m.khqr} alt="KHQR" className="w-full" />}
+        {m.khqr && <img src={m.khqr} alt="KHQR" className="w-full aspect-[2/3]" />}
         <div className="px-3 py-2">
           {m.voice ? <Voice m={m} playing={playing} /> : <span className="whitespace-pre-line">{m.text || m.caption}</span>}
           <Stamp t={m.t} read={me} />
@@ -163,8 +161,8 @@ export default function Demo() {
   useEffect(() => { [TEE, OVERSIZE, "/demo/khqr-16.png"].forEach((src) => { new Image().src = src; }); }, []);
   const status = typing === "rec" ? "កំពុងថតសំឡេង…" : typing ? "កំពុងសរសេរ…" : "បូត · ឆ្លើយតបភ្លាមៗ";
   return (
-    <div className="min-h-[100dvh] bg-[#05070b] md:grid md:place-items-center md:py-6" style={KM} data-testid="demo-page">
-      <div className="relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0E1621] md:h-[844px] md:w-[390px] md:rounded-[44px] md:border-[10px] md:border-[#1c2230] md:shadow-2xl">
+    <div className="min-h-[100dvh] select-none bg-[#05070b] md:grid md:place-items-center md:py-6" style={KM} data-testid="demo-page">
+      <div className="relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0E1621] md:h-[min(844px,calc(100dvh-48px))] md:w-[390px] md:rounded-[44px] md:border-[10px] md:border-[#1c2230] md:shadow-2xl">
         <Header status={status} />
         {note && <Note note={note} key={note[1]} />}
         <div ref={scroller} className="flex-1 overflow-y-auto space-y-2.5 px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

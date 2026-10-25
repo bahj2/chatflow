@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only test of the public /demo page (Khmer Telegram-style auto-play demo) at mobile 390x844 and desktop 1920x800, plus regression checks. The whole flow works: intro, all 9 messages in the right order (3 customer, 6 bot), typing and recording status, 5 annotation pills, end overlay, replay. No page errors. The voice files are missing and the backup timing kicks in, so there is no hang. Full run takes about 31 s, shorter than the ~35-45 s estimate, because no real audio plays. One real bug: the KHQR image message is not fully scrolled into view for about 4 s. One design issue: at 800px height the phone frame does not fit the screen.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Demo auto-scroll / KHQR bubble", "issue": "When the KHQR message appears (~21 s), the chat scrolls before the <img> has its height, so the scroll stops about 301px short of the bottom. The QR code and caption stay partly hidden behind the composer for about 4 s, until the 'payment received' message triggers another scroll. Measured: the bottom gap was 0 every second except 301,301,301,301,62 at 21-25 s. Mobile: scroll gap 91 at 26 s. This is the key moment of the sales video.", "selector": "[data-testid=demo-msg-bot] img[alt=KHQR]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/demo desktop 1920x800", "issues": ["Phone frame has a fixed height of 844px plus 24px vertical padding, so total page height is 892 > 800. The bottom of the phone (composer) is cut off and the page scrolls. Consider md:h-[min(844px,calc(100dvh-48px))]."]},
+      {"screen": "/demo timing", "issues": ["The 'ស្ដាប់យល់សារជាសំឡេងខ្មែរ' and 'ឆ្លើយតបវិញជាសំឡេង' pills only appear after the voice note finishes playing (3 s / 7 s later), not when the voice bubble appears. This may be intended; consider showing them while the audio plays.", "Optional: add select-none on the demo root. A double-tap/double-click on Start left all chat text highlighted with the selection color, which would ruin a screen recording."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix the KHQR auto-scroll: give the KHQR img a fixed size (e.g. className 'w-full aspect-[2/3]', since the image is 600x900), or re-run scrollTo in the img's onLoad.",
+    "Make the desktop phone frame fit short screens (max height of 100dvh minus padding).",
+    "Optional: add select-none to the demo container; consider showing the voice pills while audio plays."
+  ],
+  "critical_code_review_comments": [
+    "Demo.jsx: start() does not reset the playing state, and replaying does not stop the previous Audio element (run-id guard only). This is harmless today because replay is only possible after the end, but it is fragile.",
+    "Missing mp3s are served as the SPA index.html (206, text/html). Audio onerror and the play() rejection both fire setTimeout(done). It resolves twice, which is harmless; the backup timing works.",
+    "Album/KHQR imgs have alt='' or 'KHQR' and the album uses a fixed h-36 with object-cover, so there is no distortion (checked: 500x376 and 500x750 sources at 142x144; KHQR 600x900 at 212x318, aspect kept)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "92%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "/demo is purely scripted on the frontend. Verified at 390x844: intro texts, header shop name and status, status changes to typing/recording, message order and counts (me=3, bot=6), notes, end overlay with 4 features, replay resets to 0 messages and plays again, double-click Start gives no duplicates, scrollWidth 390, khqr-16.png loads 200. /demo/*.mp3 currently return the HTML fallback. Regression: / loads, /embed redirects to /, /dashboard redirects to /login when logged out.",
+  "rca of the issue": "The scroll useEffect runs on msgs change and uses scrollHeight before the KHQR image's height is laid out; the image has no fixed size. Smooth scroll goes to the old, shorter scrollHeight. Fix: give the image a fixed size or re-scroll on image load."
+}
