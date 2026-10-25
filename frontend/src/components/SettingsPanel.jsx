@@ -97,7 +97,6 @@ export default function SettingsPanel() {
             <Textarea rows={7} value={s.business_info} onChange={set("business_info")} data-testid="business-info-input"
               placeholder="e.g. We sell handmade leather bags. Prices from $40. Free delivery over $100. Open Mon–Sat 9:00–18:00. Payment: card or cash on delivery." />
           </Field>
-          <Field label="Greeting on website chat"><Input value={s.greeting} onChange={set("greeting")} data-testid="greeting-input" /></Field>
         </Section>
 
         <Section title="FAQs" desc="Common questions and the exact answers you want the AI to use.">

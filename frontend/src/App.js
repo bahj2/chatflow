@@ -6,7 +6,6 @@ import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
-import Embed from "@/pages/Embed";
 import AuthCallback from "@/pages/AuthCallback";
 
 const Protected = ({ children }) => {
@@ -24,7 +23,6 @@ function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route path="/embed" element={<Embed />} />
       <Route path="/dashboard/*" element={<Protected><Dashboard /></Protected>} />
     </Routes>
   );

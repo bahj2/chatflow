@@ -87,7 +87,6 @@ class Settings(BaseModel):
     language: str = "auto"
     model: str = "claude"
     auto_reply: bool = True
-    greeting: str = "Hi! How can I help you today?"
     telegram_token: str = ""
     fb_page_token: str = ""
     fb_verify_token: str = ""
@@ -113,12 +112,6 @@ class ProductIn(BaseModel):
     price: str = Field(default="", max_length=40)
     description: str = Field(default="", max_length=1000)
     image_media_id: str = ""
-
-
-class PublicChatIn(BaseModel):
-    session_id: str = Field(max_length=100)
-    text: str = Field(max_length=2000)
-    name: Optional[str] = None
 
 
 class ReplyIn(BaseModel):
@@ -481,7 +474,7 @@ async def send_to_channel(conv: dict, text: str, s: Settings):
 
 async def deliver(conv: dict, s: Settings, text: str, voice_mp3: Optional[bytes], products: list, order: Optional[dict] = None):
     ch, to = conv["channel"], conv["external_id"]
-    if ch == "web" or not ((ch == "telegram" and s.telegram_token) or (ch == "messenger" and s.fb_page_token)):
+    if not ((ch == "telegram" and s.telegram_token) or (ch == "messenger" and s.fb_page_token)):
         return
     if voice_mp3 is None:
         await send_to_channel(conv, text, s)
@@ -677,11 +670,10 @@ async def settle_order(order: dict, by: str) -> bool:
     lang = "km" if last and M.KHMER.search(last.get("text", "")) else "en"
     text = PAID_MSG[lang].format(number=order["number"], amount=P.fmt_amount(order["total"], order["currency"]))
     await add_message(conv, "ai", text)
-    if conv["channel"] != "web":
-        try:
-            await send_to_channel(conv, text, await get_settings(order["business_id"]))
-        except Exception as e:
-            logger.warning("paid notice not delivered: %s", e)
+    try:
+        await send_to_channel(conv, text, await get_settings(order["business_id"]))
+    except Exception as e:
+        logger.warning("paid notice not delivered: %s", e)
     return True
 
 
@@ -782,27 +774,7 @@ async def payments_preview(user=Depends(current_user)):
     return {"media_id": media["id"], "mode": q["mode"], "deeplink": q["deeplink"]}
 
 
-# ---------- Public (website widget) ----------
-DEFAULT_BID = {}
-
-
-async def resolve_bid(bid: str) -> str:
-    if bid == "default":
-        if "v" not in DEFAULT_BID:
-            admin = await db.users.find_one({"email": os.environ['ADMIN_EMAIL'].lower()}, {"_id": 0, "business_id": 1})
-            DEFAULT_BID["v"] = admin["business_id"]
-        return DEFAULT_BID["v"]
-    if not await db.businesses.find_one({"id": bid}, {"_id": 1}):
-        raise HTTPException(404, "Business not found")
-    return bid
-
-
-@api.get("/public/{bid}/info")
-async def public_info(bid: str):
-    s = await get_settings(await resolve_bid(bid))
-    return {"business_name": s.business_name, "greeting": s.greeting}
-
-
+# ---------- Rate limiting ----------
 RATE = {}
 
 
@@ -832,44 +804,6 @@ def rate_ok(rules) -> bool:
     for q in queues:
         q.append(now)
     return True
-
-
-@api.post("/public/{bid}/chat")
-async def public_chat(bid: str, body: PublicChatIn, request: Request):
-    bid = await resolve_bid(bid)
-    if not body.text.strip():
-        raise HTTPException(400, "Empty message")
-    ip = client_ip(request)
-    if not rate_ok([(f"s:{bid}:{body.session_id}", 6, 60), (f"ip:{ip}", 20, 60), (f"iph:{ip}", 150, 3600)]):
-        raise HTTPException(429, "You're sending messages too fast. Please wait a moment and try again.")
-    msg = await handle_incoming(bid, "web", body.session_id, body.name or "Website visitor", body.text.strip())
-    return {"reply": msg}
-
-
-@api.post("/public/{bid}/voice")
-async def public_voice(bid: str, request: Request, bg: BackgroundTasks, session_id: str = Form(..., max_length=100), name: str = Form("Website visitor"),
-                       file: UploadFile = File(...)):
-    bid = await resolve_bid(bid)
-    ip = client_ip(request)
-    if not rate_ok([(f"s:{bid}:{session_id}", 6, 60), (f"ip:{ip}", 20, 60), (f"iph:{ip}", 150, 3600)]):
-        raise HTTPException(429, "You're sending messages too fast. Please wait a moment and try again.")
-    data = await file.read()
-    if not data or len(data) > 10 * 1024 * 1024:
-        raise HTTPException(400, "Voice message must be under 10 MB")
-    bg.add_task(handle_incoming, bid, "web", session_id, name[:80], "", audio=data)  # voice replies can take > 60 s; widget polls
-    s = await get_settings(bid)
-    conv = await db.conversations.find_one({"business_id": bid, "channel": "web", "external_id": session_id}, {"_id": 0, "ai_enabled": 1})
-    return {"accepted": True, "ai_reply": bool(s.auto_reply and (conv or {}).get("ai_enabled", True))}
-
-
-@api.get("/public/{bid}/chat/{session_id}")
-async def public_history(bid: str, session_id: str):
-    bid = await resolve_bid(bid)
-    conv = await db.conversations.find_one({"business_id": bid, "channel": "web", "external_id": session_id}, {"_id": 0})
-    if not conv:
-        return {"messages": []}
-    msgs = await db.messages.find({"conversation_id": conv["id"]}, {"_id": 0}).sort("created_at", 1).to_list(500)
-    return {"messages": msgs}
 
 
 # ---------- Webhooks ----------
@@ -1334,7 +1268,7 @@ async def cron_notion_sync(request: Request, bg: BackgroundTasks):
 async def stats(user=Depends(current_user)):
     bid = user["business_id"]
     res = {"total": await db.conversations.count_documents({"business_id": bid})}
-    for ch in ["web", "telegram", "messenger"]:
+    for ch in ["telegram", "messenger"]:
         res[ch] = await db.conversations.count_documents({"business_id": bid, "channel": ch})
     res["ai_replies"] = await db.messages.count_documents({"business_id": bid, "role": "ai"})
     res["agent_replies"] = await db.messages.count_documents({"business_id": bid, "role": "agent"})
@@ -1375,37 +1309,6 @@ async def channels_status(user=Depends(current_user)):
         except Exception:
             pass
     return {"telegram": tg, "messenger": {"configured": bool(s.fb_page_token and s.fb_verify_token and s.fb_app_secret)}}
-
-
-WIDGET_JS = r"""(function(){
-  if (window.__replyflow) return; window.__replyflow = 1;
-  var s = document.currentScript, origin = new URL(s.src).origin;
-  var biz = s.getAttribute('data-business') || 'default';
-  var color = (s.getAttribute('data-color') || '#10B981');
-  var side = s.getAttribute('data-position') === 'left' ? 'left' : 'right';
-  function init(){
-    var f = document.createElement('iframe');
-    f.src = origin + '/embed?b=' + encodeURIComponent(biz) + '&site=' + encodeURIComponent(location.hostname);
-    f.title = 'Chat'; f.allow = 'clipboard-write; microphone; autoplay';
-    f.style.cssText = 'position:fixed;bottom:92px;' + side + ':20px;width:370px;max-width:calc(100vw - 40px);height:540px;max-height:calc(100vh - 120px);border:0;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);z-index:2147483646;display:none;background:#0F1522';
-    var b = document.createElement('button');
-    b.setAttribute('aria-label', 'Open chat'); b.id = 'replyflow-bubble';
-    b.style.cssText = 'position:fixed;bottom:20px;' + side + ':20px;width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;background:' + color + ';color:#0B0F17;box-shadow:0 8px 30px rgba(0,0,0,.3);z-index:2147483647;display:flex;align-items:center;justify-content:center;transition:transform .2s';
-    var chat = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>';
-    var close = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
-    b.innerHTML = chat;
-    b.onmouseenter = function(){ b.style.transform = 'scale(1.06)'; };
-    b.onmouseleave = function(){ b.style.transform = 'none'; };
-    b.onclick = function(){ var open = f.style.display === 'none'; f.style.display = open ? 'block' : 'none'; b.innerHTML = open ? close : chat; };
-    document.body.appendChild(f); document.body.appendChild(b);
-  }
-  if (document.body) init(); else document.addEventListener('DOMContentLoaded', init);
-})();"""
-
-
-@api.get("/widget.js")
-async def widget_js():
-    return Response(WIDGET_JS, media_type="application/javascript", headers={"Cache-Control": "public, max-age=300"})
 
 
 SUMMARY_PROMPT = (

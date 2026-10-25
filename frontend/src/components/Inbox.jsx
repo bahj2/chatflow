@@ -8,7 +8,7 @@ import { ChannelBadge } from "@/components/ChannelBadge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
-const FILTERS = ["all", "web", "telegram", "messenger"];
+const FILTERS = ["all", "telegram", "messenger"];
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
 const when = (iso) => {
   if (!iso) return "";
@@ -34,7 +34,7 @@ const ConvList = ({ convs, active, onPick, filter, setFilter, q, setQ, total, ha
     </div>
     <div ref={listRef} className="flex-1 overflow-y-auto" data-testid="conversation-list"
       onScroll={(e) => { const el = e.currentTarget; if (hasMore && !loadingMore && el.scrollTop + el.clientHeight > el.scrollHeight - 300) onMore(); }}>
-      {convs.length === 0 && <p className="p-6 text-sm text-slate-500" data-testid="inbox-empty">No conversations yet. Try the chat on your website!</p>}
+      {convs.length === 0 && <p className="p-6 text-sm text-slate-500" data-testid="inbox-empty">No conversations yet. Connect Telegram or Messenger in Channels.</p>}
       {convs.map((c) => (
         <button key={c.id} onClick={() => onPick(c)} data-testid={`conversation-item-${c.id}`}
           className={`w-full text-left px-4 py-3.5 border-b border-white/5 transition-colors ${active?.id === c.id ? "bg-emerald-500/[0.07] border-l-2 border-l-emerald-400" : "hover:bg-white/[0.03]"}`}>

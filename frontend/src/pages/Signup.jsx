@@ -5,7 +5,7 @@ import { useAuth, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { GoogleIcon, googleRedirect } from "@/pages/Login";
 
-const PERKS = ["Your own AI assistant trained on your business", "Telegram, Messenger & website chat", "Private inbox for you and your team"];
+const PERKS = ["Your own AI assistant trained on your business", "Telegram & Facebook Messenger", "Private inbox for you and your team"];
 
 export default function Signup() {
   const { user, register } = useAuth();

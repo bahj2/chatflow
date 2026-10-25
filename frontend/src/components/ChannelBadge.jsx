@@ -1,13 +1,12 @@
-import { Send, Globe, Facebook } from "lucide-react";
+import { Send, Facebook } from "lucide-react";
 
 const MAP = {
   telegram: { label: "Telegram", color: "#229ED9", Icon: Send },
   messenger: { label: "Messenger", color: "#0084FF", Icon: Facebook },
-  web: { label: "Website", color: "#10B981", Icon: Globe },
 };
 
 export const ChannelBadge = ({ channel, compact = false }) => {
-  const c = MAP[channel] || MAP.web;
+  const c = MAP[channel] || MAP.telegram;
   return (
     <span
       data-testid={`channel-badge-${channel}`}

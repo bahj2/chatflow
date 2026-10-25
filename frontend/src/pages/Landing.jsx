@@ -1,17 +1,17 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Send, Facebook, Globe, Zap, Brain, Hand, Sparkles } from "lucide-react";
-import { ChatPanel, ChatWidget } from "@/components/ChatWidget";
+import { ArrowRight, Send, Facebook, QrCode, Zap, Brain, Hand, Sparkles } from "lucide-react";
+import { TelegramDemo } from "@/components/TelegramDemo";
 
 const FEATURES = [
   { Icon: Send, color: "#229ED9", t: "Telegram bot", d: "Paste your BotFather token, click connect. Every message gets an instant reply." },
   { Icon: Facebook, color: "#0084FF", t: "Facebook Messenger", d: "Connect your Page and answer customers 24/7 — even while you sleep." },
-  { Icon: Globe, color: "#10B981", t: "Website chat", d: "A live chat bubble on your site, powered by the same AI brain." },
+  { Icon: QrCode, color: "#E11D48", t: "Bakong KHQR payments", d: "When a customer confirms an order, the AI sends a KHQR with the exact total. Pay with any Cambodian bank app." },
   { Icon: Brain, color: "#F59E0B", t: "Knows your business", d: "Teach it your products, prices and FAQs once. It understands what clients really mean." },
 ];
 
 const STEPS = [
   ["01", "Describe your business", "Shop, services or anything else — add info, FAQs and pick a tone."],
-  ["02", "Connect your channels", "Telegram and Messenger tokens, plus a website chat — all in one place."],
+  ["02", "Connect your channels", "Paste your Telegram bot token and connect your Facebook Page — all in one place."],
   ["03", "AI replies, you stay in control", "Take over any chat, or tap an AI-suggested reply to answer in one click."],
 ];
 
@@ -39,9 +39,9 @@ export default function Landing() {
       </nav>
 
       <section className="grid-bg relative">
-        <div className="max-w-7xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-[1.15fr_1fr] gap-14 items-center">
-          <div className="rise">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-400 mb-6">Telegram · Messenger · Website</p>
+        <div className="max-w-7xl mx-auto px-6 pt-20 pb-24 grid lg:grid-cols-[1.15fr_1fr] gap-14 items-start">
+          <div className="rise lg:pt-24">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-400 mb-6">Telegram · Messenger · Bakong KHQR</p>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05]">
               Every client message,<br />answered in <span className="text-emerald-400">seconds.</span>
             </h1>
@@ -56,15 +56,15 @@ export default function Landing() {
               <a href="#how" data-testid="hero-how-btn" className="rounded-full border border-white/15 px-7 py-3.5 font-semibold hover:bg-white/5 transition-colors">How it works</a>
             </div>
             <div className="mt-12 flex gap-10 text-sm">
-              {[["< 5s", "avg. reply"], ["24/7", "always on"], ["3", "channels"]].map(([a, b]) => (
+              {[["< 5s", "avg. reply"], ["24/7", "always on"], ["2", "channels"]].map(([a, b]) => (
                 <div key={b}><p className="font-display text-2xl font-bold">{a}</p><p className="text-slate-500">{b}</p></div>
               ))}
             </div>
           </div>
           <div className="rise relative" style={{ animationDelay: "0.15s" }}>
             <div className="absolute -inset-6 bg-emerald-500/10 blur-3xl rounded-full" />
-            <p className="relative font-mono text-[11px] uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2"><Sparkles className="h-3 w-3 text-emerald-400" /> Live demo — try it now</p>
-            <ChatPanel className="relative h-[460px]" />
+            <p className="relative font-mono text-[11px] uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2"><Sparkles className="h-3 w-3 text-emerald-400" /> Real example — a customer on Telegram</p>
+            <TelegramDemo className="relative max-w-md mx-auto lg:mx-0" />
           </div>
         </div>
       </section>
@@ -103,7 +103,6 @@ export default function Landing() {
           <p className="text-sm text-slate-500">© {new Date().getFullYear()} ReplyFlow</p>
         </div>
       </footer>
-      <ChatWidget />
     </div>
   );
 }
