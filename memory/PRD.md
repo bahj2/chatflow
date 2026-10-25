@@ -120,6 +120,12 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 
 
 
+## Iteration 16 (2026-06) — Final marketing video (pending clips)
+- Preview video (9:16, 60 s, temporary voices): /demo/replyflow-demo-preview.mp4
+- User chose: own Voice Creator Pro clips (7 lines n1–n5, c1, c2), tall 9:16; waiting for upload → run scripts/import_voice_clips.py FILES then scripts/make_demo_video.py
+- Next after video (user-approved): split backend/server.py into routers (no behaviour change)
+
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

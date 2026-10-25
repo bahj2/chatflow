@@ -5,23 +5,33 @@ const TEE = "https://images.unsplash.com/photo-1620799139507-2a76f79a2f4d?crop=e
 const OVERSIZE = "https://images.unsplash.com/photo-1622445275463-afa2ab738c34?crop=entropy&cs=srgb&fm=jpg&q=80&w=500";
 const KM = { fontFamily: "'Noto Sans Khmer', 'Manrope', sans-serif" };
 
+const VIDEO = new URLSearchParams(window.location.search).get("video") === "1";
+const VOICE = (name) => `/demo/voice/${name}.mp3`;
+
+// `say` = narrator line (video mode only); `play` = chat voice note; `vwait` = wait used in video mode.
 const SCRIPT = [
-  { wait: 700, msg: { from: "me", text: "សួស្តីបង! មានអាវយឺតពណ៌ស ទំហំ M ទេ?", t: "23:04" } },
+  { say: "n1" },
+  { wait: 700, vwait: 300, msg: { from: "me", text: "សួស្តីបង! មានអាវយឺតពណ៌ស ទំហំ M ទេ?", t: "23:04" } },
   { wait: 400, typing: 1700 },
   { msg: { from: "bot", album: [TEE, OVERSIZE], caption: "អាវយឺតកប្បាស ពណ៌ស — 8$\nអាវយឺតធំទូលាយ ពណ៌ស — 10$", t: "23:04" } },
   { wait: 200, note: [Images, "បង្ហាញរូបទំនិញដោយស្វ័យប្រវត្តិ"] },
-  { wait: 1100, typing: 1500 },
+  { say: "n2" },
+  { wait: 1100, vwait: 300, typing: 1500 },
   { msg: { from: "bot", text: "មានបង! ទំហំ M នៅមានស្តុកទាំងពីរម៉ូដ។ អាវយឺតកប្បាស 8$ និងអាវយឺតធំទូលាយ 10$ ។ បងចូលចិត្តមួយណាដែរ?", t: "23:04" } },
-  { wait: 2800, msg: { from: "me", voice: "/demo/customer-voice.mp3", dur: 3, t: "23:05" }, play: true, note: [Mic, "ស្ដាប់យល់សារជាសំឡេងខ្មែរ"] },
+  { wait: 2800, vwait: 1800, say: "n3" },
+  { vwait: 300, msg: { from: "me", voice: "c1", dur: 3, t: "23:05" }, play: true, note: [Mic, "ស្ដាប់យល់សារជាសំឡេងខ្មែរ"] },
   { wait: 300, typing: 1800, recording: true },
-  { msg: { from: "bot", voice: "/demo/bot-voice.mp3", dur: 7, t: "23:05" }, play: true, note: [Volume2, "ឆ្លើយតបវិញជាសំឡេង"] },
+  { msg: { from: "bot", voice: "c2", dur: 7, t: "23:05" }, play: true, note: [Volume2, "ឆ្លើយតបវិញជាសំឡេង"] },
   { wait: 300, msg: { from: "bot", text: "ចាស បង! អាវយឺតកប្បាសពណ៌ស ទំហំ M × ២ សរុប 16$ ។ សូមស្កេន KHQR ខាងក្រោម ដើម្បីទូទាត់។", t: "23:05" } },
   { wait: 1000, msg: { from: "bot", khqr: "/demo/khqr-16.png", caption: "KHQR · 16$ · ស្កេនបានក្នុងរយៈពេល ១០ នាទី", t: "23:05" } },
   { wait: 200, note: [QrCode, "ផ្ញើ KHQR តាមចំនួនទឹកប្រាក់ពិតប្រាកដ"] },
-  { wait: 3800, msg: { from: "bot", text: "បានទទួលការទូទាត់ ✅ សូមអរគុណ! ការកម្ម៉ង់ RF-8C21A9E4 · 16$ ត្រូវបានបញ្ជាក់។", t: "23:06" } },
+  { say: "n4" },
+  { wait: 3800, vwait: 600, msg: { from: "bot", text: "បានទទួលការទូទាត់ ✅ សូមអរគុណ! ការកម្ម៉ង់ RF-8C21A9E4 · 16$ ត្រូវបានបញ្ជាក់។", t: "23:06" } },
   { wait: 200, note: [BadgeCheck, "បញ្ជាក់ការទូទាត់ដោយស្វ័យប្រវត្តិ"] },
   { wait: 2000, msg: { from: "me", text: "អរគុណច្រើនបង!", t: "23:06" } },
-  { wait: 2600, end: true },
+  { wait: 2600, vwait: 1800, end: true },
+  { say: "n5" },
+  { vwait: 1500 },
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,18 +113,18 @@ const Composer = () => (
 const FEATURES = [[Zap, "ឆ្លើយភ្លាមៗ ជាភាសាខ្មែរ ២៤ ម៉ោង"], [Mic, "ស្ដាប់ និងឆ្លើយជាសំឡេង"], [Images, "បង្ហាញរូបទំនិញដោយខ្លួនឯង"], [QrCode, "ទទួលប្រាក់តាម KHQR"]];
 
 const Overlay = ({ end, onStart }) => (
-  <div className={`absolute inset-0 z-30 flex flex-col px-7 demo-fade ${end ? "justify-center bg-[#0B0F17]" : "justify-end pb-14 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/95 to-[#0B0F17]/60"}`} data-testid={end ? "demo-end" : "demo-intro"}>
+  <div className={`absolute inset-0 z-30 flex flex-col px-7 demo-fade ${end || VIDEO ? "justify-center bg-[#0B0F17]" : "justify-end pb-14 bg-gradient-to-t from-[#0B0F17] via-[#0B0F17]/95 to-[#0B0F17]/60"}`} data-testid={end ? "demo-end" : "demo-intro"}>
     <p className="flex items-center gap-2 text-emerald-400 font-display font-bold text-lg"><span className="h-8 w-8 rounded-lg bg-emerald-500 text-slate-950 grid place-items-center"><Zap className="h-4 w-4" /></span>ReplyFlow</p>
     <h1 className="mt-5 text-[30px] font-bold leading-[1.35] text-white">{end ? "ឆ្លើយសារ បង្ហាញទំនិញ ទទួលប្រាក់ — ដោយស្វ័យប្រវត្តិ" : "អតិថិជនផ្ញើសារ ម៉ោង ១១ យប់?"}</h1>
     <p className="mt-3 text-[16px] leading-relaxed text-slate-300">{end ? "AI ជួយលក់ជំនួសអ្នក លើ Telegram និង Messenger" : "AI ឆ្លើយជំនួសអ្នកភ្លាមៗ ជាភាសាខ្មែរ ទាំងអក្សរ និងសំឡេង"}</p>
     {end && <ul className="mt-6 space-y-3">{FEATURES.map(([Icon, t], i) => (
       <li key={t} className="flex items-center gap-3 text-[15px] text-slate-100 demo-pop" style={{ animationDelay: `${0.2 + i * 0.15}s` }}><span className="h-9 w-9 rounded-full bg-emerald-500/15 text-emerald-400 grid place-items-center"><Icon className="h-4 w-4" /></span>{t}</li>
     ))}</ul>}
-    <button type="button" onClick={onStart} data-testid={end ? "demo-replay-btn" : "demo-start-btn"}
+    {!VIDEO && <button type="button" onClick={onStart} data-testid={end ? "demo-replay-btn" : "demo-start-btn"}
       className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-7 py-4 text-[16px] font-bold text-slate-950 active:scale-[0.98] transition-transform">
       {end ? <><RotateCcw className="h-5 w-5" /> មើលម្ដងទៀត</> : <><Play className="h-5 w-5" /> ចាប់ផ្ដើម</>}
-    </button>
-    {!end && <p className="mt-4 text-center text-[13px] text-slate-500">បើកការថតអេក្រង់ជាមុនសិន រួចចុច «ចាប់ផ្ដើម»</p>}
+    </button>}
+    {!end && !VIDEO && <p className="mt-4 text-center text-[13px] text-slate-500">បើកការថតអេក្រង់ជាមុនសិន រួចចុច «ចាប់ផ្ដើម»</p>}
   </div>
 );
 
@@ -126,7 +136,9 @@ const playAudio = (src, fallbackSec) => new Promise((resolve) => {
   a.play().catch(() => setTimeout(done, fallbackSec * 1000));
 });
 
-const useScript = () => {
+const cue = (name) => console.log(`CUE ${name} ${Date.now()}`); // read by scripts/make_demo_video.py
+
+const useScript = (timeline) => {
   const [msgs, setMsgs] = useState([]);
   const [typing, setTyping] = useState(null);
   const [note, setNote] = useState(null);
@@ -135,34 +147,47 @@ const useScript = () => {
   const run = useRef(0);
   const start = async () => {
     const id = ++run.current;
-    setMsgs([]); setNote(null); setTyping(null); setPhase("playing");
+    setMsgs([]); setNote(null); setTyping(null); setPhase(VIDEO ? "intro" : "playing");
+    if (VIDEO) cue("START");
     let count = 0;
     for (const step of SCRIPT) {
-      await sleep(step.wait || 0);
+      if (step.say && !VIDEO) continue;
+      await sleep((VIDEO ? step.vwait ?? step.wait : step.wait) || 0);
       if (run.current !== id) return;
+      if (step.say) { cue(step.say); await sleep((timeline[step.say] || 2) * 1000 + 350); if (step.say === "n1") setPhase("playing"); continue; }
       if (step.typing) { setTyping(step.recording ? "rec" : "type"); await sleep(step.typing); setTyping(null); }
       if (step.note) { setNote(step.note); setTimeout(() => run.current === id && setNote((n) => (n === step.note ? null : n)), 2300); }
       if (step.msg) {
         const idx = count++;
         setMsgs((m) => [...m, step.msg]);
-        if (step.play) { setPlaying(idx); await playAudio(step.msg.voice, step.msg.dur); if (run.current !== id) return; setPlaying(-1); }
+        if (step.play) {
+          setPlaying(idx);
+          if (VIDEO) { cue(step.msg.voice); await sleep((timeline[step.msg.voice] || step.msg.dur) * 1000 + 250); } else await playAudio(VOICE(step.msg.voice), step.msg.dur);
+          if (run.current !== id) return;
+          setPlaying(-1);
+        }
       }
       if (step.end) setPhase("end");
     }
+    if (VIDEO) cue("DONE");
   };
   useEffect(() => () => { run.current += 1; }, []);
   return { msgs, typing, note, playing, phase, start };
 };
 
 export default function Demo() {
-  const { msgs, typing, note, playing, phase, start } = useScript();
+  const [timeline, setTimeline] = useState(null);
+  const { msgs, typing, note, playing, phase, start } = useScript(timeline || {});
+  useEffect(() => { if (VIDEO) fetch("/demo/voice/timeline.json").then((r) => r.json()).then(setTimeline).catch(() => setTimeline({})); }, []);
+  useEffect(() => { if (VIDEO && timeline) setTimeout(start, 1500); }, [timeline]); // eslint-disable-line react-hooks/exhaustive-deps
   const scroller = useRef(null);
   useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }); }, [msgs, typing]);
   useEffect(() => { [TEE, OVERSIZE, "/demo/khqr-16.png"].forEach((src) => { new Image().src = src; }); }, []);
   const status = typing === "rec" ? "កំពុងថតសំឡេង…" : typing ? "កំពុងសរសេរ…" : "បូត · ឆ្លើយតបភ្លាមៗ";
   return (
-    <div className="min-h-[100dvh] select-none bg-[#05070b] md:grid md:place-items-center md:py-6" style={KM} data-testid="demo-page">
-      <div className="relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0E1621] md:h-[min(844px,calc(100dvh-48px))] md:w-[390px] md:rounded-[44px] md:border-[10px] md:border-[#1c2230] md:shadow-2xl">
+    <div className={VIDEO ? "select-none" : "min-h-[100dvh] select-none bg-[#05070b] md:grid md:place-items-center md:py-6"} style={VIDEO ? { ...KM, zoom: 2.5 } : KM} data-testid="demo-page">
+      <div className={VIDEO ? "relative flex h-[768px] w-[432px] flex-col overflow-hidden bg-[#0E1621]"
+        : "relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0E1621] md:h-[min(844px,calc(100dvh-48px))] md:w-[390px] md:rounded-[44px] md:border-[10px] md:border-[#1c2230] md:shadow-2xl"}>
         <Header status={status} />
         {note && <Note note={note} key={note[1]} />}
         <div ref={scroller} className="flex-1 overflow-y-auto space-y-2.5 px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
