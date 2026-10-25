@@ -1,0 +1,26 @@
+{
+  "summary": "Website chat removal verified end-to-end. Backend 12/12 pytest pass: all /api/public/* (bid 'default' and loadtest bid) + /api/widget.js return 404; Mongo has 0 'web' conversations/orders, 0 orphan messages, 0 'greeting' keys in settings; /api/stats returns telegram+messenger and no 'web'; GET/PUT /api/settings works without greeting (legacy 'greeting' in body is ignored); /api/ai/test returns reply + order_total; Telegram webhook (loadtest, temporary fake token, correct sha256 secret) -> 200 and AI reply stored; bad secret 403; Messenger webhook with valid HMAC -> AI created a pending messenger order (latte), mark-paid 200 -> 'Payment received' message stored, second mark-paid 409; bad signature 403. Temp creds restored to '' and test data cleaned. Frontend: Landing shows telegram-demo with Khmer question, latte photo + caption 'Iced Palm Sugar Latte — 2.5$', Khmer bot reply, 'យក ២ កែវ', KHQR image (/landing/khqr-demo.png 200, loaded), Khmer paid message; tagline 'Telegram · Messenger · Bakong KHQR' (CSS uppercase), '2 channels', 4 features without Website chat; no chat bubble/live demo; mobile 390 no horizontal overflow. /embed renders blank. Signup perks 'Telegram & Facebook Messenger'. Admin: Inbox filters all/telegram/messenger only, filters work; Channels shows only Telegram & Messenger (no embed/preview); AI Settings has no greeting; Orders & Settings load; zero console errors, zero 4xx/5xx network responses.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/embed and any unknown route", "issues": ["App.js has no catch-all Route, so /embed (and any unknown URL) renders a completely blank page. Consider <Route path='*' element={<Navigate to='/' />} /> so old embed links land somewhere useful."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter17_web_chat_removal.py", "/app/test_reports/pytest/iter17.xml"],
+  "action_items": [
+    "Optional: add a catch-all route in App.js (blank page on /embed and unknown routes)",
+    "Optional: delete/mark obsolete old tests that call /api/public/* (e.g. test_iter2_security_widget_summary.py, test_iter15_khqr_live.py chat() helper, test_iter16_khqr_fixes_live.py) — they now fail by design"
+  ],
+  "critical_code_review_comments": [
+    "GET /api/settings returns raw secrets (telegram_token, fb_app_secret, fb_page_token, voxcpm_key) to any business member — pre-existing, not part of this change, but consider masking for 'member' role",
+    "Landing demo Khmer paid message is a shortened version of backend PAID_MSG['km'] (missing 'ត្រូវបានបញ្ជាក់') — cosmetic only"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter17_web_chat_removal.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persisted. Test temporarily set loadtest business telegram_token/fb_app_secret to fake values and restored them to '' afterward; created TEST conversations/orders were deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Website chat is removed by design; /api/public/* 404 is expected. To regression-test webhooks without real bots, use test_iter17_web_chat_removal.py 'creds' fixture (temp fake telegram_token + fb_app_secret on loadtest bid 4f0dbc25..., fb_page_token empty so nothing is sent outward). Never post to admin business webhook."
+}

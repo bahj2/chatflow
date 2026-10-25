@@ -100,6 +100,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - UI: Settings "Bakong KHQR payments" section, Orders page (nav), Inbox KHQR card with Mark paid (2-click for expired/cancelled), AI test shows order total
 - media.KHMER now letters only (excludes ៛/digits). iteration_15 + 16 pass; relay mode tested with MOCKED KHQR.dev only (no real rbk token)
 
+## Iteration 14 (2026-06) — Website chat removed
+- User: "people in Cambodia never use it" → channels are now Telegram + Facebook Messenger only
+- Removed: /api/public/* widget endpoints, /api/widget.js, ChatWidget.jsx, Embed page (/embed → redirects to /), Channels "Website chat" card/embed code, Inbox "Web" filter, ChannelBadge web, greeting setting; stats without web
+- Deleted all channel 'web' conversations/messages/media (scripts/delete_web_chats.py: 1107 convs, 1219 msgs)
+- Landing: live demo replaced by TelegramDemo.jsx (Khmer question → product photo → KHQR /landing/khqr-demo.png → payment received); features: Telegram, Messenger, Bakong KHQR payments, Knows your business
+- iteration_17 pass (100%). Old tests calling /api/public/* are obsolete by design
+
+
 
 
 
