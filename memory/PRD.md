@@ -120,10 +120,16 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 
 
 
-## Iteration 16 (2026-06) — Final marketing video (pending clips)
-- Preview video (9:16, 60 s, temporary voices): /demo/replyflow-demo-preview.mp4
-- User chose: own Voice Creator Pro clips (7 lines n1–n5, c1, c2), tall 9:16; waiting for upload → run scripts/import_voice_clips.py FILES then scripts/make_demo_video.py
-- Next after video (user-approved): split backend/server.py into routers (no behaviour change)
+## Iteration 16 (2026-06) — Voice Creator Pro (VoxCPM2) + no Microsoft voices
+- User: "voice clone using VoxCPM2 from voicecreator.pro, don't use Azure"; use the Voice Creator Pro API as an alternative to Hugging Face
+- Voice Creator Pro has NO cloud API: its HTTP API runs only inside the desktop app (http://127.0.0.1:8100, /api/v1/*, X-API-Key). Each business connects it through a public https tunnel (cloudflared quick tunnel) + the app's API key
+- media.py: vcp_connect (health JSON check, refuses VCP without an API key, wrong key, lists saved voices, detects VoxCPM2 model_family), vcp_speak (POST /api/v1/generation/clone?sync=true with voice_id, or the ReplyFlow seller sample trimmed to 15 s, else /generation/design "A warm, friendly young woman"); speak(): Khmer = VCP → HF VoxCPM2 demo → text, one 60 s budget
+- Endpoints: POST /api/voice/vcp/connect {url,key}, POST /api/voice/vcp/refresh, PUT /api/voice/vcp/voice {voice_id}, DELETE /api/voice/vcp; /api/voice/test {only_vcp}; vcp_key never returned; PUT /settings can't change vcp_* fields
+- UI: VcpConnect.jsx in AI Settings → Voice → Khmer voice card (steps, tunnel command, connect form, voice picker, Test, Refresh, Disconnect)
+- Removed: edge-tts/Microsoft voices, khmer_voice setting, old Colab/Modal pairing endpoints + VoxAutoConnect.jsx + /voxcpm/*.py, voxcpm_pairs collection, Microsoft-voice preview video + clips
+- Demo video: user makes 7 clips in Voice Creator Pro and attaches them (import_voice_clips.py → make_demo_video.py), or once connected: scripts/gen_demo_voice_vcp.py OWNER_EMAIL [narrator=ID customer=ID shop=ID]
+- iteration_19 pass 100% with MOCKED VCP (scripts/mock_vcp.py behind a real cloudflared tunnel); NOT tested with the real desktop app
+- Next (user-approved, after the video): split backend/server.py into routers (no behaviour change)
 
 
 ## Backlog

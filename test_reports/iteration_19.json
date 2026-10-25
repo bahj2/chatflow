@@ -1,0 +1,19 @@
+{
+  "summary": "Iteration 19: Voice Creator Pro (VoxCPM2) integration tested end-to-end against mock_vcp.py behind the real cloudflared tunnel. Backend 16/16 pytest pass + manual computer-off case pass. Frontend VcpConnect flow (steps, form validation, wrong key error, connect, voice select, test audio, refresh, Save keeps connection, disconnect, mobile 390px no overflow) all pass, no page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter19_vcp.py", "/app/backend/tests/iter19_computer_off.sh", "/app/test_reports/pytest/iter19_vcp.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "vcp_key is stored in plaintext in db.settings (Notion token is stored encrypted as token_enc) - consider encrypting it the same way",
+    "public_https() returns True when DNS resolution fails, and httpx resolves the host again later (DNS-rebinding TOCTOU) - small SSRF risk; consider pinning the resolved IP or re-checking at request time",
+    "vcp_link() calls rate_ok before the https/private-host checks, so simple validation errors use up the 30/hour connect+refresh budget",
+    "server.py is ~1414 lines (>700) - consider moving the VCP/voice endpoints into their own router module"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter19_vcp.py", "/app/backend/tests/iter19_computer_off.sh"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. vcp-test@example.com is left DISCONNECTED from VCP (seller sample kept). Mock VCP restarted (setsid) after the computer-off test and is running on :8199; the tunnel was never stopped.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified: connect validation (http->400, 127.0.0.1->400, example.com->424 'does not answer like', wrong key->424 'Wrong API key', OK->200 with trailing slash stripped, model voxcpm2, 2 voices); settings never return vcp_key; PUT /settings cannot change vcp_url/voice_id/voices/key; voice pick nope->400, v_rasmey/''->200; only_vcp clone+voice_id, clone+ref_audio+ref_text with the 10 s sample, media /api/media/{id} returns audio/mpeg; Khmer without only_vcp -> voxcpm2-vcp, English -> openai; refresh keeps chosen voice; delete clears everything, refresh after delete->400; old voxcpm-check/pair endpoints 404/405; computer off -> only_vcp 424 'Cannot reach...', general Khmer 424 (HF demo down). Telegram webhook without secret 403, Messenger bad verify token 403. Design mode (no voice + no sample) was NOT tested (would need the seller sample deleted); main agent already verified it. About 6 VCP connect/refresh calls were used against the 30/hour in-memory limit."
+}
