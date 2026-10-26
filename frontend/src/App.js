@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { ThemeProvider, useTheme } from "@/lib/theme";
 import Landing from "@/pages/Landing";
 import Demo from "@/pages/Demo";
 import Login from "@/pages/Login";
@@ -11,7 +12,7 @@ import AuthCallback from "@/pages/AuthCallback";
 
 const Protected = ({ children }) => {
   const { user } = useAuth();
-  if (user === null) return <div className="min-h-screen grid place-items-center text-slate-400">Loading…</div>;
+  if (user === null) return <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 };
@@ -31,14 +32,18 @@ function AppRoutes() {
   );
 }
 
+const ThemedToaster = () => <Toaster theme={useTheme().theme} position="top-center" />;
+
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-      <Toaster theme="dark" position="top-center" />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+        <ThemedToaster />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

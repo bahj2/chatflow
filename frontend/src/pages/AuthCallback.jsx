@@ -20,5 +20,5 @@ export default function AuthCallback() {
       });
   }, [hash, loginGoogle, failGoogle, navigate]);
 
-  return <div className="min-h-screen grid place-items-center text-slate-400" data-testid="auth-callback">Signing you in…</div>;
+  return <div className="min-h-screen grid place-items-center text-muted-foreground" data-testid="auth-callback">Signing you in…</div>;
 }

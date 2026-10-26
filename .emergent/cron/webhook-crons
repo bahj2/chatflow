@@ -1,0 +1,9 @@
+# Managed by Emergent webhook-cron (pod-local syscron). DO NOT EDIT.
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+JOB_ID=85316ae6-c328-4c50-8009-68aa94bce7bb
+WEBHOOK_ENV_FILE=/app/backend/.env
+CRON_API_URL=https://ea.int.apis.emergentagent.com
+
+0 * * * * root CRON_NAME=notion-sync METHOD=POST ENDPOINT_URL_B64=aHR0cHM6Ly9lMGUwMDBiZS00YWFlLTQyZTYtODAwOS1kY2Y2NzdjMmExYWUucHJldmlldy5lbWVyZ2VudGFnZW50LmNvbS9hcGkvY3Jvbi9ub3Rpb24tc3luYw== /bin/sh /app/.emergent/cron/dispatch_webhook.sh >> /var/log/webhook-cron.log 2>&1
+* * * * * root JOB_ID=85316ae6-c328-4c50-8009-68aa94bce7bb CRON_API_URL=https://ea.int.apis.emergentagent.com /bin/sh /app/.emergent/cron/watch_crons.sh >> /var/log/webhook-cron.log 2>&1

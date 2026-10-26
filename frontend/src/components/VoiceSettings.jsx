@@ -30,12 +30,12 @@ const Preview = ({ text, label, testid, s }) => {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" onClick={run} disabled={busy} data-testid={testid}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/5 disabled:opacity-60">
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted/60 disabled:opacity-60">
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} {busy ? "Generating…" : label}
       </button>
       {res && <><audio controls autoPlay src={mediaUrl(res.media_id)} className="h-9" data-testid={`${testid}-audio`} />
-        <span className="text-[11px] font-mono text-slate-500" data-testid={`${testid}-engine`}>engine: {ENGINES[res.engine] || res.engine}</span></>}
-      {err && <span className="w-full text-xs text-amber-300" data-testid={`${testid}-error`}>{err}</span>}
+        <span className="text-[11px] font-mono text-muted-foreground/80" data-testid={`${testid}-engine`}>engine: {ENGINES[res.engine] || res.engine}</span></>}
+      {err && <span className="w-full text-xs text-amber-700 dark:text-amber-300" data-testid={`${testid}-error`}>{err}</span>}
     </div>
   );
 };
@@ -68,28 +68,28 @@ const SellerVoice = ({ s, setS }) => {
     catch (e) { toast.error(errMsg(e)); }
   };
   return (
-    <div className="space-y-3 border-t border-white/10 pt-4" data-testid="seller-voice">
+    <div className="space-y-3 border-t border-border pt-4" data-testid="seller-voice">
       <div>
         <p className="font-medium text-sm" data-testid="seller-voice-title">{s.assistant_name?.trim() ? `${s.assistant_name.trim()}’s voice` : "Seller’s own voice"} (voice clone)</p>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed">Record or upload 5–30 seconds of the seller speaking Khmer naturally in a quiet room. VoxCPM2 copies the voice, rhythm and emotion. Only this shop’s bot and page use it; every shop has its own. Without a sample, the default young woman’s voice is used.</p>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Record or upload 5–30 seconds of the seller speaking Khmer naturally in a quiet room. VoxCPM2 copies the voice, rhythm and emotion. Only this shop’s bot and page use it; every shop has its own. Without a sample, the default young woman’s voice is used.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={toggleRec} disabled={busy} data-testid="seller-voice-record-btn"
-          className={`${btn} ${rec.recording ? "bg-red-500 text-white" : "border border-white/10 hover:bg-white/5"}`}>
+          className={`${btn} ${rec.recording ? "bg-red-500 text-white" : "border border-border hover:bg-muted/60"}`}>
           {rec.recording ? <><Square className="h-3.5 w-3.5" /> Stop {clock(rec.seconds)} / {clock(MAX_SECONDS)}</> : <><Mic className="h-3.5 w-3.5" /> Record</>}
         </button>
-        <button type="button" onClick={() => fileRef.current?.click()} disabled={busy || rec.recording} data-testid="seller-voice-upload-btn" className={`${btn} border border-white/10 hover:bg-white/5`}>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={busy || rec.recording} data-testid="seller-voice-upload-btn" className={`${btn} border border-border hover:bg-muted/60`}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} {busy ? "Saving…" : "Upload audio"}
         </button>
         <input ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="seller-voice-input"
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f, f.name); }} />
         {s.seller_voice_media_id && <>
           <audio controls preload="metadata" src={`${mediaUrl(s.seller_voice_media_id)}?auth=${localStorage.getItem("rf_token")}`} className="h-9" data-testid="seller-voice-audio" />
-          <button type="button" onClick={remove} data-testid="seller-voice-delete-btn" className={`${btn} border border-white/10 text-slate-400 hover:text-red-300`}><Trash2 className="h-3.5 w-3.5" /> Remove</button>
+          <button type="button" onClick={remove} data-testid="seller-voice-delete-btn" className={`${btn} border border-border text-muted-foreground hover:text-red-600 dark:hover:text-red-300`}><Trash2 className="h-3.5 w-3.5" /> Remove</button>
         </>}
       </div>
       {s.seller_voice_media_id && <>
-        <label className="block"><span className="text-xs text-slate-400 mb-1.5 block">Exact words spoken in the sample (filled in automatically — fix any mistakes, then press Save at the top)</span>
+        <label className="block"><span className="text-xs text-muted-foreground mb-1.5 block">Exact words spoken in the sample (filled in automatically — fix any mistakes, then press Save at the top)</span>
           <Textarea rows={2} value={s.seller_voice_text} onChange={(e) => setS((x) => ({ ...x, seller_voice_text: e.target.value }))} data-testid="seller-voice-text" />
         </label>
         <Preview s={s} text="សួស្តីបង! អរគុណដែលបានទាក់ទងមកហាងយើងខ្ញុំ។ តើបងចង់កុម្ម៉ង់អ្វីដែរថ្ងៃនេះ?" label="Test seller voice" testid="seller-voice-preview-btn" />
@@ -100,8 +100,8 @@ const SellerVoice = ({ s, setS }) => {
 
 export const VoiceSection = ({ s, setS, Section, Field }) => (
   <Section title="Voice" desc="Customers can send voice messages. The AI understands them (incl. Khmer) and answers with voice.">
-    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0F1522] p-4">
-      <div><p className="font-medium text-sm">Reply with voice to voice messages</p><p className="text-xs text-slate-400">Typed messages always get text replies.</p></div>
+    <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 p-4">
+      <div><p className="font-medium text-sm">Reply with voice to voice messages</p><p className="text-xs text-muted-foreground">Typed messages always get text replies.</p></div>
       <Switch checked={s.voice_replies} onCheckedChange={(v) => setS((x) => ({ ...x, voice_replies: v }))} data-testid="voice-replies-switch" />
     </div>
     <Field label="AI voice (English and other languages)">
@@ -115,7 +115,7 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
     <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 space-y-3" data-testid="khmer-voice-card">
       <div>
         <p className="font-medium text-sm">Khmer voice — VoxCPM2</p>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
           Khmer replies are spoken by VoxCPM2 through its free official Hugging Face demo, in the seller’s own voice if a sample is added below, otherwise a warm, friendly young woman’s voice.
           If the demo is busy or down (no answer within 60 seconds), customers get the reply as text instead.
         </p>

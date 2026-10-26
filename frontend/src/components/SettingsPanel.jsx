@@ -12,14 +12,14 @@ import { PaymentsSection } from "@/components/PaymentsSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Section = ({ title, desc, children }) => (
-  <section className="grid lg:grid-cols-[260px_1fr] gap-6 py-8 border-b border-white/5">
-    <div><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-slate-400 mt-1">{desc}</p></div>
-    <div className="space-y-4 min-w-0">{children}</div>
+  <section className="grid lg:grid-cols-[240px_1fr] gap-4 lg:gap-8 py-5">
+    <div className="lg:pt-5"><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</p></div>
+    <div className="space-y-4 min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-6 card-shadow">{children}</div>
   </section>
 );
 
 export const Field = ({ label, children }) => (
-  <label className="block"><span className="text-xs font-medium text-slate-400 mb-1.5 block">{label}</span>{children}</label>
+  <label className="block"><span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>{children}</label>
 );
 
 const Pick = ({ value, onChange, items, testid }) => (
@@ -42,13 +42,13 @@ const Tester = () => {
     <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 space-y-3">
       <div className="flex gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask like a customer would…" data-testid="ai-test-input" onKeyDown={(e) => e.key === "Enter" && run()} />
-        <button onClick={run} disabled={busy} data-testid="ai-test-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 text-slate-950 px-4 text-sm font-semibold hover:bg-emerald-400 disabled:opacity-60">
+        <button onClick={run} disabled={busy} data-testid="ai-test-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg btn-brand px-4 text-sm font-semibold disabled:opacity-60">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Test
         </button>
       </div>
-      {a && <p className="text-sm text-slate-200 whitespace-pre-wrap" data-testid="ai-test-reply">{a.reply}</p>}
+      {a && <p className="text-sm text-foreground whitespace-pre-wrap" data-testid="ai-test-reply">{a.reply}</p>}
       {a?.products?.length > 0 && <Attachments atts={a.products} prefix="ai-test" />}
-      {a?.order_total && <p className="text-xs text-amber-300" data-testid="ai-test-order">A Bakong KHQR for {a.order_total} would be sent to the customer (no order is created in this test).</p>}
+      {a?.order_total && <p className="text-xs text-amber-700 dark:text-amber-300" data-testid="ai-test-order">A Bakong KHQR for {a.order_total} would be sent to the customer (no order is created in this test).</p>}
     </div>
   );
 };
@@ -58,7 +58,7 @@ export default function SettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); }, []);
-  if (!s) return <div className="p-8 text-slate-500">Loading…</div>;
+  if (!s) return <div className="p-8 text-muted-foreground/80">Loading…</div>;
 
   const set = (k) => (v) => setS({ ...s, [k]: v?.target ? v.target.value : v });
   const setFaq = (i, k, v) => setS({ ...s, faqs: s.faqs.map((f, j) => (j === i ? { ...f, [k]: v } : f)) });
@@ -78,9 +78,9 @@ export default function SettingsPanel() {
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between gap-4">
-          <div><h1 className="font-display text-3xl font-bold">AI Settings</h1><p className="text-sm text-slate-400 mt-1">Teach the AI about your business.</p></div>
+          <div><h1 className="font-display text-3xl font-bold">AI Settings</h1><p className="text-sm text-muted-foreground mt-1">Teach the AI about your business.</p></div>
           <button onClick={save} disabled={saving} data-testid="save-settings-btn"
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 text-slate-950 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-400 disabled:opacity-60">
+            className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2.5 text-sm font-semibold disabled:opacity-60">
             <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
           </button>
         </div>
@@ -106,21 +106,21 @@ export default function SettingsPanel() {
                 placeholder="e.g. សួស្តីបង! ខ្ញុំស្រីមុំ មកពីហាងយើងខ្ញុំ។ តើបងចង់រកទំនិញអ្វីដែរ?" />
             </Field>
           </div>
-          <p className="text-xs text-slate-500">Each shop has its own seller name, greeting and cloned voice (AI Settings → Voice). Leave the greeting empty to let the AI answer the first message directly.</p>
+          <p className="text-xs text-muted-foreground/80">Each shop has its own seller name, greeting and cloned voice (AI Settings → Voice). Leave the greeting empty to let the AI answer the first message directly.</p>
         </Section>
 
         <Section title="FAQs" desc="Common questions and the exact answers you want the AI to use.">
           {s.faqs.map((f, i) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-[#0F1522] p-4 space-y-2" data-testid={`faq-item-${i}`}>
+            <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2" data-testid={`faq-item-${i}`}>
               <div className="flex gap-2">
                 <Input value={f.q} onChange={(e) => setFaq(i, "q", e.target.value)} placeholder="Question" data-testid={`faq-q-${i}`} />
-                <button onClick={() => setS({ ...s, faqs: s.faqs.filter((_, j) => j !== i) })} data-testid={`faq-delete-${i}`} className="text-slate-500 hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => setS({ ...s, faqs: s.faqs.filter((_, j) => j !== i) })} data-testid={`faq-delete-${i}`} className="text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
               </div>
               <Textarea rows={2} value={f.a} onChange={(e) => setFaq(i, "a", e.target.value)} placeholder="Answer" data-testid={`faq-a-${i}`} />
             </div>
           ))}
           <button onClick={() => setS({ ...s, faqs: [...s.faqs, { q: "", a: "" }] })} data-testid="add-faq-btn"
-            className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
         </Section>
 
         <NotionSection Section={Section} />
@@ -131,14 +131,14 @@ export default function SettingsPanel() {
           <div className="flex gap-2">
             <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@gmail.com" type="email" data-testid="allowed-email-input"
               onKeyDown={(e) => e.key === "Enter" && addEmail()} />
-            <button onClick={addEmail} data-testid="add-allowed-email-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-4 text-sm hover:bg-white/5"><Plus className="h-4 w-4" /> Add</button>
+            <button onClick={addEmail} data-testid="add-allowed-email-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-4 text-sm hover:bg-muted/60"><Plus className="h-4 w-4" /> Add</button>
           </div>
           <div className="flex flex-wrap gap-2" data-testid="allowed-emails-list">
-            {s.allowed_emails.length === 0 && <p className="text-xs text-slate-500">No Google accounts yet — add your Gmail, then click Save.</p>}
+            {s.allowed_emails.length === 0 && <p className="text-xs text-muted-foreground/80">No Google accounts yet — add your Gmail, then click Save.</p>}
             {s.allowed_emails.map((em) => (
-              <span key={em} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0F1522] pl-3 pr-1.5 py-1 text-sm" data-testid={`allowed-email-${em}`}>
+              <span key={em} className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 pl-3 pr-1.5 py-1 text-sm" data-testid={`allowed-email-${em}`}>
                 {em}
-                <button onClick={() => setS({ ...s, allowed_emails: s.allowed_emails.filter((x) => x !== em) })} data-testid={`remove-allowed-email-${em}`} className="text-slate-500 hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setS({ ...s, allowed_emails: s.allowed_emails.filter((x) => x !== em) })} data-testid={`remove-allowed-email-${em}`} className="text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400"><Trash2 className="h-3.5 w-3.5" /></button>
               </span>
             ))}
           </div>
@@ -146,16 +146,16 @@ export default function SettingsPanel() {
 
         <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
           {s.quick_replies.map((r, i) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-[#0F1522] p-4 space-y-2" data-testid={`quick-item-${i}`}>
+            <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2" data-testid={`quick-item-${i}`}>
               <div className="flex gap-2">
                 <Input value={r.label} onChange={(e) => setQr(i, "label", e.target.value)} placeholder="Button label, e.g. Prices" data-testid={`quick-label-${i}`} />
-                <button onClick={() => setS({ ...s, quick_replies: s.quick_replies.filter((_, j) => j !== i) })} data-testid={`quick-delete-${i}`} className="text-slate-500 hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
+                <button onClick={() => setS({ ...s, quick_replies: s.quick_replies.filter((_, j) => j !== i) })} data-testid={`quick-delete-${i}`} className="text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
               </div>
               <Textarea rows={2} value={r.text} onChange={(e) => setQr(i, "text", e.target.value)} placeholder="Message that will be sent" data-testid={`quick-text-${i}`} />
             </div>
           ))}
           <button onClick={() => setS({ ...s, quick_replies: [...s.quick_replies, { label: "", text: "" }] })} data-testid="add-quick-btn"
-            className="inline-flex items-center gap-1.5 text-sm text-emerald-400 hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
         </Section>
 
         <VoiceSection s={s} setS={setS} Section={Section} Field={Field} />
@@ -173,8 +173,8 @@ export default function SettingsPanel() {
                 items={[["auto", "Same as customer"], ["English", "English"], ["Russian", "Russian"], ["Ukrainian", "Ukrainian"], ["Spanish", "Spanish"], ["Vietnamese", "Vietnamese"], ["Thai", "Thai"]]} />
             </Field>
           </div>
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#0F1522] p-4">
-            <div><p className="font-medium text-sm">Auto-reply on all channels</p><p className="text-xs text-slate-400">Turn off to only use suggested replies.</p></div>
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 p-4">
+            <div><p className="font-medium text-sm">Auto-reply on all channels</p><p className="text-xs text-muted-foreground">Turn off to only use suggested replies.</p></div>
             <Switch checked={s.auto_reply} onCheckedChange={set("auto_reply")} data-testid="auto-reply-switch" />
           </div>
           <Field label="Try it (save first to test new info)"><Tester /></Field>

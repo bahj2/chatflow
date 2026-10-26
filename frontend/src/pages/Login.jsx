@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, Link, useLocation } from "react-router-dom";
-import { BrandMark, BRAND } from "@/components/Brand";
+import { AuthShell, authCard, googleBtn, Divider } from "@/components/AuthShell";
 import { useAuth, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 
@@ -38,29 +38,24 @@ export default function Login() {
   };
 
   return (
-    <div className="grain grid-bg min-h-screen grid place-items-center px-6">
-      <form onSubmit={submit} className="rise w-full max-w-sm bg-[#0F1522] border border-white/10 rounded-2xl p-8" data-testid="login-form">
-        <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg mb-8">
-          <BrandMark />{BRAND}
-        </Link>
+    <AuthShell eyebrow="Welcome back" title="Your AI seller is already answering. Jump back in.">
+      <form onSubmit={submit} className={authCard} data-testid="login-form">
         <h1 className="font-display text-2xl font-bold">Sign in</h1>
-        <p className="text-sm text-slate-400 mt-1 mb-6">Access your inbox and AI settings.</p>
+        <p className="text-sm text-muted-foreground mt-1 mb-6">Access your inbox and AI settings.</p>
         <div className="space-y-3">
-          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email-input" required />
-          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="login-password-input" required />
+          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email-input" required className="h-11" />
+          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="login-password-input" required className="h-11" />
         </div>
-        {error && <p className="text-sm text-red-400 mt-3" data-testid="login-error">{error}</p>}
-        <button disabled={busy} data-testid="login-submit-btn"
-          className="mt-6 w-full rounded-full bg-emerald-500 text-slate-950 py-3 font-semibold hover:bg-emerald-400 transition-colors disabled:opacity-60">
+        {error && <p className="text-sm text-red-600 dark:text-red-400 mt-3" data-testid="login-error">{error}</p>}
+        <button disabled={busy} data-testid="login-submit-btn" className="mt-6 w-full rounded-full btn-brand py-3 font-semibold disabled:opacity-60">
           {busy ? "Signing in…" : "Sign in"}
         </button>
-        <div className="flex items-center gap-3 my-5 text-xs text-slate-500"><span className="h-px flex-1 bg-white/10" />or<span className="h-px flex-1 bg-white/10" /></div>
-        <button type="button" onClick={google} data-testid="google-login-btn"
-          className="w-full rounded-full bg-white text-slate-900 py-3 font-semibold hover:bg-slate-200 transition-colors flex items-center justify-center gap-2.5">
+        <Divider />
+        <button type="button" onClick={google} data-testid="google-login-btn" className={googleBtn}>
           <GoogleIcon /> Continue with Google
         </button>
-        <p className="text-sm text-slate-400 text-center mt-6">New here? <Link to="/signup" className="text-emerald-400 hover:text-emerald-300 font-semibold" data-testid="go-signup-link">Create a business account</Link></p>
+        <p className="text-sm text-muted-foreground text-center mt-6">New here? <Link to="/signup" className="text-primary hover:underline underline-offset-4 font-semibold" data-testid="go-signup-link">Create a business account</Link></p>
       </form>
-    </div>
+    </AuthShell>
   );
 }
