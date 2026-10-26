@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Send, Facebook, QrCode, Zap, Brain, Hand, Sparkles } from "lucide-react";
+import { ArrowRight, Send, Facebook, QrCode, Brain, Hand, Sparkles } from "lucide-react";
+import { BrandMark, BRAND } from "@/components/Brand";
 import { TelegramDemo } from "@/components/TelegramDemo";
 
 const FEATURES = [
@@ -21,8 +22,8 @@ export default function Landing() {
       <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#0B0F17]/70 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2 font-display font-bold text-lg" data-testid="nav-logo">
-            <span className="h-8 w-8 rounded-lg bg-emerald-500 text-slate-950 grid place-items-center"><Zap className="h-4 w-4" /></span>
-            ReplyFlow
+            <BrandMark />
+            {BRAND}
           </div>
           <div className="hidden md:flex gap-8 text-sm text-slate-400">
             <a href="#features" className="hover:text-white transition-colors">Features</a>

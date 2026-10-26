@@ -132,6 +132,12 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - User's own clips can still replace them: scripts/import_voice_clips.py FILES → make_demo_video.py
 - Next (user-approved, after the video): split backend/server.py into routers (no behaviour change)
 
+## Iteration 17 (2026-06) — Replyflow AI logo
+- User logo (blue + purple reply bubbles) → transparent icon /brand/logo-icon.png, /brand/favicon.png, /brand/apple-touch-icon.png, /favicon.ico
+- components/Brand.jsx (BRAND = "Replyflow AI", BrandMark) used in Landing nav, Login, Signup, Dashboard sidebar; tab title + meta description updated
+- User picked both "rename" and "keep": brand lockups read "Replyflow AI", sentences/body copy keep "ReplyFlow"; sales video unchanged (user chose "only the app")
+- Mobile dashboard header: business name truncates properly; hidden for superadmin (no room with the extra Businesses tab)
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

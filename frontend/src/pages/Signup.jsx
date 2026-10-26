@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { Zap, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import { BrandMark, BRAND } from "@/components/Brand";
 import { useAuth, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { GoogleIcon, googleRedirect } from "@/pages/Login";
@@ -40,7 +41,7 @@ export default function Signup() {
       <div className="grid place-items-center px-6 py-12">
         <form onSubmit={submit} className="rise w-full max-w-sm bg-[#0F1522] border border-white/10 rounded-2xl p-8" data-testid="signup-form">
           <Link to="/" className="flex items-center gap-2 font-display font-bold text-lg mb-8">
-            <span className="h-8 w-8 rounded-lg bg-emerald-500 text-slate-950 grid place-items-center"><Zap className="h-4 w-4" /></span>ReplyFlow
+            <BrandMark />{BRAND}
           </Link>
           <h1 className="font-display text-2xl font-bold">Create your account</h1>
           <p className="text-sm text-slate-400 mt-1 mb-6">Get your own AI inbox in under a minute.</p>

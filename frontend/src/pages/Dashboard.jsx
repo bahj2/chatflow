@@ -1,5 +1,6 @@
 import { NavLink, Routes, Route, Link, Navigate } from "react-router-dom";
-import { Inbox as InboxIcon, Settings2, Plug, LogOut, Zap, ExternalLink, Building2, Package, Receipt } from "lucide-react";
+import { Inbox as InboxIcon, Settings2, Plug, LogOut, ExternalLink, Building2, Package, Receipt } from "lucide-react";
+import { BrandMark, BRAND } from "@/components/Brand";
 import { useAuth } from "@/lib/auth";
 import Inbox from "@/components/Inbox";
 import SettingsPanel from "@/components/SettingsPanel";
@@ -23,15 +24,15 @@ export default function Dashboard() {
     <div className="h-screen flex flex-col md:flex-row bg-[#0B0F17]">
       <aside className="md:w-20 lg:w-56 shrink-0 border-b md:border-b-0 md:border-r border-white/5 bg-[#0D121C] flex md:flex-col items-center lg:items-stretch gap-1 p-3">
         <Link to="/" className="flex items-center gap-2 font-display font-bold px-2 py-2 md:mb-6" data-testid="dash-logo">
-          <span className="h-8 w-8 rounded-lg bg-emerald-500 text-slate-950 grid place-items-center"><Zap className="h-4 w-4" /></span>
-          <span className="hidden lg:inline">ReplyFlow</span>
+          <BrandMark />
+          <span className="hidden lg:inline">{BRAND}</span>
         </Link>
-        <span className="md:hidden text-sm font-semibold truncate max-w-[110px]" data-testid="dash-business-name-mobile">{user.business_name}</span>
+        {user.role !== "superadmin" && <span className="md:hidden flex-1 min-w-0 text-sm font-semibold truncate" data-testid="dash-business-name-mobile">{user.business_name}</span>}
         <div className="hidden lg:block px-3 pb-4 -mt-3" data-testid="dash-business-name">
           <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500">Business</p>
           <p className="text-sm font-semibold truncate">{user.business_name}</p>
         </div>
-        <nav className="flex md:flex-col gap-1 flex-1">
+        <nav className={`flex md:flex-col gap-1 md:flex-1 ${user.role === "superadmin" ? "flex-1" : ""}`}>
           {nav.map(({ to, label, Icon, end, id }) => (
             <NavLink key={to} to={to} end={end} data-testid={`nav-${id}`}
               className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-emerald-500/10 text-emerald-400" : "text-slate-400 hover:text-white hover:bg-white/5"}`}>
