@@ -112,7 +112,7 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
     </Field>
     <Preview s={s} text="Hi! Thanks for your message. How can I help you today?" label="Preview voice" testid="voice-preview-btn" />
 
-    <div className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 space-y-3" data-testid="khmer-voice-card">
+    <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.06] dark:border-amber-400/25 dark:bg-amber-400/[0.07] p-4 space-y-3" data-testid="khmer-voice-card">
       <div>
         <p className="font-medium text-sm">Khmer voice — VoxCPM2</p>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">

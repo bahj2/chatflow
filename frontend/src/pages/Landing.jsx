@@ -69,7 +69,7 @@ const Hero = () => (
         </div>
       </div>
       <div className="rise relative" style={{ animationDelay: "0.15s" }}>
-        <div className="absolute -inset-10 brand-glow pointer-events-none" />
+        <div className="absolute inset-0 sm:-inset-10 brand-glow pointer-events-none" />
         <p className="relative font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2"><Sparkles className="h-3 w-3 text-primary" /> Real example — a customer on Telegram</p>
         <TelegramDemo className="relative max-w-md mx-auto lg:mx-0" />
       </div>

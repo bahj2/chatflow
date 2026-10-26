@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only test of the UI redesign + light/dark theme toggle. All requested flows PASS: theme-toggle present on Landing nav, Login, Signup, Dashboard sidebar (desktop bottom) and mobile top bar; default (empty localStorage) = dark; toggling flips <html>.dark and writes rf_theme light/dark; persists across reload and Landing->Login->Signup->Dashboard navigation. Both themes visually checked at 1920x800 and 390x844 on /, /login, /signup, /dashboard (inbox + open conversation + AI summary + quick replies + composer), products (+Add product dialog), orders, settings (business, FAQs, Notion, Bakong payments, team access, quick replies, voice/khmer-voice-card/seller voice, AI behaviour), channels, businesses: no unreadable text or invisible inputs/borders found; no horizontal overflow on mobile; mobile admin top bar (logo + 6 nav icons + theme toggle + logout) fits within 390px (logout right edge 382px). Landing testids all render, links -> /signup, /login, #how correct. Login admin works -> /dashboard, wrong password shows login-error 'Invalid email or password'; google-login-btn and signup-google-btn present; go-signup-link/go-login-link navigate. Nav active state (bg-primary/10 text-primary) ok; logout clears rf_token -> /login. Settings save: assistant-name-input set to TEST_Bot, saved, reload kept, restored to '' and verified. Filter chips switch (admin: all=2, telegram=2, messenger=0). Primary buttons use btn-brand gradient; green kept for AI auto-reply/success. No page JS errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inbox / Settings voice (dark mode)", "issues": ["Native <audio> controls render as light/white pills on dark bubbles and cards (browser default). Cosmetic; could add `color-scheme: dark` on .dark root so native controls follow theme."]},
+      {"screen": "Settings khmer-voice-card (dark)", "issues": ["Light mode shows an amber-tinted card; in dark it is almost indistinguishable from the surrounding card (very faint tint). Cosmetic only."]},
+      {"screen": "Attachments.jsx product card", "issues": ["Still hardcoded bg-white (product photo/KHQR card) - stays white in dark mode; likely intentional for QR readability, just confirm."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add `.dark { color-scheme: dark; }` in index.css so native audio/select/scrollbar controls match dark theme",
+    "Optional: slightly stronger amber tint for khmer-voice-card in dark mode"
+  ],
+  "critical_code_review_comments": [
+    "theme.js toggles the class inside a setState updater (side effect in updater; under StrictMode double-invocation could toggle twice in dev). Safer: compute next, then set class/localStorage in a useEffect on [theme]. Not reproduced as a bug in preview.",
+    "Remaining hardcoded colours are intentional (text-white on bg-brand, red destructive buttons, brand hexes for Telegram/Messenger icons, slate-500 neutral status chips)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested)", "frontend": "100%"},
+  "seed_data_creation": "None. assistant_name of admin business temporarily set to TEST_Bot and restored to empty.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Theme stored in localStorage rf_theme; pre-paint script in public/index.html. Load-test owner loadtest+706ab4fd now has 0 conversations (Businesses table also shows 0) - use admin@replyflow.com (2 Telegram chats) for inbox/conversation tests. Mobile dashboard uses duplicate testids (desktop sidebar + mobile top bar) - use ':visible' selectors."
+}

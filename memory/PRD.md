@@ -151,6 +151,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Verified: tests/check_unique_channels.py (same bot 409, same bot new secret 409, own bot 200, re-save 200; FB same page 409 / other page 200 with stubbed Graph lookup)
 - Seller voice clones are stored per shop (settings.seller_voice_media_id per business_id), never shared
 
+## Iteration 20 (2026-06) — UI redesign + light/dark toggle
+- User (Khmer): "make the UI prettier"; chose Landing + Login/Signup + Dashboard; brand = logo blue→purple gradient, green kept as accent (AI-on / success / paid); light/dark toggle
+- index.css: light :root + .dark tokens (background, surface, card, muted, border, primary indigo), .btn-brand / .bg-brand / .text-brand gradients, .card-shadow, theme-aware .grid-bg, color-scheme per theme
+- lib/theme.js ThemeProvider (localStorage rf_theme, default dark) + public/index.html pre-paint script; components/ThemeToggle.jsx (data-testid theme-toggle) on Landing nav, auth pages, dashboard sidebar/mobile bar; Toaster follows theme
+- scripts/theme_codemod.py converted hardcoded slate/white/#hex classes in all components/pages to tokens (TelegramDemo + Demo keep Telegram dark look)
+- New: components/AuthShell.jsx (gradient showcase panel + form side) used by Login/Signup; Landing rebuilt (eyebrow pill, gradient headline, stat cards, 6 feature cards incl. Khmer voice + product photos, numbered steps, gradient CTA band, footer); Dashboard sidebar (business card, gradient active indicator, theme toggle); Settings sections are cards
+- iteration_20: frontend 100% pass (both themes, 1920 + 390)
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members
