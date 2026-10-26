@@ -91,6 +91,7 @@ class Settings(BaseModel):
     auto_reply: bool = True
     telegram_token: str = ""
     fb_page_token: str = ""
+    fb_page_id: str = ""
     fb_verify_token: str = ""
     fb_app_secret: str = ""
     quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])
@@ -281,10 +282,41 @@ async def read_settings(user=Depends(current_user)):
     return (await get_settings(user["business_id"])).model_dump()
 
 
+TG_TAKEN = "This Telegram bot is already connected to another shop. Each shop needs its own bot: create a new one with @BotFather."
+FB_TAKEN = "This Facebook page is already connected to another shop. Each shop needs its own page."
+
+
+def same_bot(token: str) -> dict:
+    return {"telegram_token": {"$regex": f"^{re.escape(token.split(':', 1)[0])}:"}}  # same bot even after its token is revoked
+
+
+async def taken_by_other(bid: str, query: dict) -> bool:
+    return bool(await db.settings.find_one({"business_id": {"$ne": bid}, **query}, {"_id": 1}))
+
+
+async def fb_page_id(token: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=10) as h:
+            return str((await h.get("https://graph.facebook.com/v21.0/me", params={"access_token": token, "fields": "id"})).json().get("id", ""))
+    except Exception:
+        return ""
+
+
 @api.put("/settings")
 async def write_settings(body: Settings, user=Depends(current_user)):
+    bid = user["business_id"]
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
-    cur = await get_settings(user["business_id"])
+    cur = await get_settings(bid)
+    body.telegram_token, body.fb_page_token = body.telegram_token.strip(), body.fb_page_token.strip()
+    if body.telegram_token and body.telegram_token != cur.telegram_token and await taken_by_other(bid, same_bot(body.telegram_token)):
+        raise HTTPException(409, TG_TAKEN)
+    body.fb_page_id = cur.fb_page_id
+    if body.fb_page_token and (body.fb_page_token != cur.fb_page_token or not cur.fb_page_id):
+        body.fb_page_id = await fb_page_id(body.fb_page_token)
+        if body.fb_page_id and await taken_by_other(bid, {"fb_page_id": body.fb_page_id}):
+            raise HTTPException(409, FB_TAKEN)
+    elif not body.fb_page_token:
+        body.fb_page_id = ""
     if body.seller_voice_media_id != cur.seller_voice_media_id:
         body.seller_voice_text = cur.seller_voice_text  # stale tab: keep the transcript of the stored sample
     body.seller_voice_media_id = cur.seller_voice_media_id  # only /settings/seller-voice may change it
@@ -294,8 +326,8 @@ async def write_settings(body: Settings, user=Depends(current_user)):
         raise HTTPException(400, "Bakong account ID looks wrong. Example: name@aclb")
     if body.khqr_token and not body.khqr_token.startswith(P.RELAY_PREFIX):
         raise HTTPException(400, "KHQR.dev token must start with rbk")
-    await db.settings.update_one({"business_id": user["business_id"]}, {"$set": body.model_dump()}, upsert=True)
-    await db.businesses.update_one({"id": user["business_id"]}, {"$set": {"name": body.business_name}})
+    await db.settings.update_one({"business_id": bid}, {"$set": body.model_dump()}, upsert=True)
+    await db.businesses.update_one({"id": bid}, {"$set": {"name": body.business_name}})
     return body.model_dump()
 
 
@@ -1179,6 +1211,8 @@ async def telegram_connect(body: TelegramConnectIn, user=Depends(current_user)):
     s = await get_settings(bid)
     if not s.telegram_token:
         raise HTTPException(400, "Save your Telegram bot token first")
+    if await taken_by_other(bid, same_bot(s.telegram_token)):
+        raise HTTPException(409, TG_TAKEN)
     url = f"{body.base_url.rstrip('/')}/api/webhooks/telegram/{bid}"
     async with httpx.AsyncClient(timeout=20) as h:
         me_r = (await h.get(f"https://api.telegram.org/bot{s.telegram_token}/getMe")).json()

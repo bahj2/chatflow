@@ -145,6 +145,12 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - UI: AI Settings → Business: "Seller name" + "Greeting for new customers"; Voice card title shows "<name>’s voice (voice clone)", notes each shop has its own
 - Verified with tests/check_shop_voices.py (3 shops, VoxCPM2 HF): clone pitch follows each shop's sample (147→150 Hz man, 254→262 Hz young woman, 167→185 Hz elderly woman); greetings + names correct per shop; test shops deleted afterwards
 
+## Iteration 19 (2026-06) — One bot / one page per shop (no mix-ups)
+- PUT /settings: 409 if the Telegram bot (matched by bot id = token part before ":", so a revoked/regenerated token of the same bot is also caught) or the Facebook page (Settings.fb_page_id from Graph /me, set server-side) already belongs to another shop
+- POST /channels/telegram/connect re-checks before setWebhook
+- Verified: tests/check_unique_channels.py (same bot 409, same bot new secret 409, own bot 200, re-save 200; FB same page 409 / other page 200 with stubbed Graph lookup)
+- Seller voice clones are stored per shop (settings.seller_voice_media_id per business_id), never shared
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members
