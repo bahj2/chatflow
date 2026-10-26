@@ -97,6 +97,16 @@ export default function SettingsPanel() {
             <Textarea rows={7} value={s.business_info} onChange={set("business_info")} data-testid="business-info-input"
               placeholder="e.g. We sell handmade leather bags. Prices from $40. Free delivery over $100. Open Mon–Sat 9:00–18:00. Payment: card or cash on delivery." />
           </Field>
+          <div className="grid sm:grid-cols-[220px_1fr] gap-4">
+            <Field label="Seller name (who the AI speaks as)">
+              <Input value={s.assistant_name} onChange={set("assistant_name")} maxLength={40} placeholder="e.g. Sreymom" data-testid="assistant-name-input" />
+            </Field>
+            <Field label="Greeting for new customers (also sent on Telegram /start)">
+              <Textarea rows={2} value={s.greeting} onChange={set("greeting")} maxLength={500} data-testid="greeting-input"
+                placeholder="e.g. សួស្តីបង! ខ្ញុំស្រីមុំ មកពីហាងយើងខ្ញុំ។ តើបងចង់រកទំនិញអ្វីដែរ?" />
+            </Field>
+          </div>
+          <p className="text-xs text-slate-500">Each shop has its own seller name, greeting and cloned voice (AI Settings → Voice). Leave the greeting empty to let the AI answer the first message directly.</p>
         </Section>
 
         <Section title="FAQs" desc="Common questions and the exact answers you want the AI to use.">

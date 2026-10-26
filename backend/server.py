@@ -82,6 +82,8 @@ class Settings(BaseModel):
     business_name: str = "My Business"
     business_type: str = "generic"
     business_info: str = ""
+    assistant_name: str = Field("", max_length=40)
+    greeting: str = Field("", max_length=500)
     faqs: List[FAQ] = []
     tone: str = "friendly"
     language: str = "auto"
@@ -373,8 +375,10 @@ def notion_text(knowledge: str) -> str:
 def system_prompt(s: Settings, products: Optional[list] = None, knowledge: str = "") -> str:
     faqs = "\n".join(f"Q: {f.q}\nA: {f.a}" for f in s.faqs) or "(none)"
     lang = "Always reply in the same language the customer writes in." if s.language == "auto" else f"Always reply in {s.language}."
+    who = (f"Your name is {s.assistant_name.strip()}, a member of the '{s.business_name}' team; use this name when you greet or introduce yourself.\n"
+           if s.assistant_name.strip() else "")
     return (
-        f"You are the customer support assistant for '{s.business_name}' (type: {s.business_type}).\n"
+        f"You are the customer support assistant for '{s.business_name}' (type: {s.business_type}).\n{who}"
         f"Business information:\n{s.business_info or '(not provided)'}\n\nFAQs:\n{faqs}\n\n{notion_text(knowledge)}"
         f"Style: {TONES.get(s.tone, TONES['friendly'])}. Keep replies short (1-3 sentences), clear and easy to read on a phone. "
         f"Understand what the customer really wants, answer it directly, and suggest a next step when helpful. {lang} "
@@ -435,7 +439,7 @@ async def get_or_create_conv(bid: str, channel: str, external_id: str, name: str
         await db.conversations.insert_one(dict(conv))
     except DuplicateKeyError:
         return await db.conversations.find_one(key, {"_id": 0})
-    return conv
+    return {**conv, "is_new": True}
 
 
 async def add_message(conv: dict, role: str, text: str, attachments: Optional[list] = None) -> dict:
@@ -549,6 +553,12 @@ async def handle_incoming(bid: str, channel: str, external_id: str, name: str, t
     s = await get_settings(bid)
     if not (s.auto_reply and conv["ai_enabled"]):
         return None
+    greeting = s.greeting.strip()
+    if greeting and (conv.get("is_new") or (channel == "telegram" and text.strip().lower().startswith("/start"))):
+        gmsg = await add_message(conv, "ai", greeting)
+        await send_to_channel(conv, greeting, s)
+        if text.strip().lower().startswith("/start"):
+            return gmsg
     products = await load_products(bid)
     try:
         raw = await generate_reply(conv["id"], s, products, spoken=bool(audio and s.voice_replies), knowledge=await N.knowledge(db, bid))

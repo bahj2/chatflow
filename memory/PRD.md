@@ -138,6 +138,13 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - User picked both "rename" and "keep": brand lockups read "Replyflow AI", sentences/body copy keep "ReplyFlow"; sales video unchanged (user chose "only the app")
 - Mobile dashboard header: business name truncates properly; hidden for superadmin (no room with the extra Businesses tab)
 
+## Iteration 18 (2026-06) — Each shop = a different person (name, greeting, cloned voice)
+- User: bot 1-3 / page 1-3 are separate shops (separate client accounts), each with its own person: voice + name + greeting
+- Settings.assistant_name (max 40) → system prompt "Your name is X…"; Settings.greeting (max 500) → sent on Telegram /start (greeting only) and as the first message of every new chat (then the AI answers)
+- get_or_create_conv returns is_new=True only when it created the chat
+- UI: AI Settings → Business: "Seller name" + "Greeting for new customers"; Voice card title shows "<name>’s voice (voice clone)", notes each shop has its own
+- Verified with tests/check_shop_voices.py (3 shops, VoxCPM2 HF): clone pitch follows each shop's sample (147→150 Hz man, 254→262 Hz young woman, 167→185 Hz elderly woman); greetings + names correct per shop; test shops deleted afterwards
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members

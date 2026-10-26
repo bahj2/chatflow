@@ -70,8 +70,8 @@ const SellerVoice = ({ s, setS }) => {
   return (
     <div className="space-y-3 border-t border-white/10 pt-4" data-testid="seller-voice">
       <div>
-        <p className="font-medium text-sm">Seller’s own voice (voice clone)</p>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed">Record or upload 5–30 seconds of the seller speaking Khmer naturally in a quiet room. VoxCPM2 copies the voice, rhythm and emotion. Without a sample, the default young woman’s voice is used.</p>
+        <p className="font-medium text-sm" data-testid="seller-voice-title">{s.assistant_name?.trim() ? `${s.assistant_name.trim()}’s voice` : "Seller’s own voice"} (voice clone)</p>
+        <p className="text-xs text-slate-400 mt-1 leading-relaxed">Record or upload 5–30 seconds of the seller speaking Khmer naturally in a quiet room. VoxCPM2 copies the voice, rhythm and emotion. Only this shop’s bot and page use it; every shop has its own. Without a sample, the default young woman’s voice is used.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={toggleRec} disabled={busy} data-testid="seller-voice-record-btn"
