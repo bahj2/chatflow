@@ -228,13 +228,15 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
             <div className="space-y-2">
               <FbButton onClick={meta.remembered ? quick : start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : busy === "start" ? "Pick your Page in the Facebook window…" : "Connect with Facebook"} testid="fb-connect-btn" />
               <p className="text-xs text-muted-foreground">A small Facebook window opens — tick your Page and press Continue. You stay on this page. You need to be an admin of the Page.</p>
+              <p className="text-xs text-muted-foreground/80" data-testid="fb-unavailable-note">If Facebook says “Feature Unavailable”, Replyflow AI is still waiting for Meta’s approval — please try again later or contact Replyflow AI support.</p>
             </div>
           )}
-          <div className={meta.available ? "border-t border-border pt-4 space-y-2" : "space-y-2"}>
+          {!meta.available && !canManual && <p className="text-sm text-muted-foreground" data-testid="fb-not-available">“Connect with Facebook” is coming soon. Please contact Replyflow AI support to connect your Page.</p>}
+          {canManual && <div className={meta.available ? "border-t border-border pt-4 space-y-2" : "space-y-2"}>
             <p className="text-sm font-semibold">{meta.available ? "Or paste your Page token — like Telegram" : "Paste your Page token — like Telegram"}</p>
             <p className="text-xs text-muted-foreground">Works right away with your own Meta app. Paste 2 things and press Connect — we set up the webhook for you.</p>
             <TokenConnect onDone={() => { load(); onChanged?.(); }} />
-          </div>
+          </div>}
         </div>
       )}
 
@@ -257,6 +259,59 @@ const Check = ({ ok, label, optional }) => (
     {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}{label}{optional && !ok ? " (optional)" : ""}
   </span>
 );
+
+const site = () => window.location.origin;
+const REVIEW = () => [
+  ["pages_show_list", `Replyflow AI is a customer-messaging service for small shops. When a shop owner presses "Connect with Facebook" in Replyflow AI (Channels page), we use pages_show_list to show the Facebook Pages that person manages, so they can choose the one Page Replyflow AI should answer messages for. We only read each Page's ID and name. Without this permission the shop owner cannot choose their Page.`],
+  ["pages_messaging", `After a shop owner connects their Page, customers who message that Page on Messenger get replies written by the shop's Replyflow AI assistant, using the shop's own product list, prices and FAQs. The shop owner reads every conversation in the Replyflow AI Inbox and can take over and reply by hand. We use pages_messaging only to receive these customer messages and send replies to them, inside the standard 24-hour messaging window, always in answer to a message the customer sent first. We never send marketing, promotional or bulk messages.`],
+  ["pages_manage_metadata", `We use pages_manage_metadata only to subscribe the shop's connected Page to our app's webhook (the "messages" field), so new customer messages reach Replyflow AI and the assistant can answer them. When the shop owner presses "Disconnect" in Replyflow AI we unsubscribe the Page. We do not change any Page settings or content.`],
+  ["public_profile", `Used for "Continue with Facebook" sign-in on Replyflow AI. We show the person's name and profile picture in their Replyflow AI account and link their Facebook account to their shop, so they can sign in again with one click. We do not post or share anything.`],
+  ["email", `Used for "Continue with Facebook" sign-in on Replyflow AI, to create the shop owner's account and to recognise an existing Replyflow AI account with the same email, so the owner does not end up with two accounts. We never send marketing email and never share the address.`],
+  ["Reviewer test steps", `1. Open ${site()}/signup and press "Sign up with Facebook". Log in with your test Facebook account, tick a test Page you manage and press Continue.\n2. You arrive on Channels in Replyflow AI and see "Connected - [your Page name]". (If you already have an account: ${site()}/login, then Channels, then "Connect with Facebook".)\n3. From a different Facebook account, send the Page a message on Messenger, for example "Hi, what do you sell?".\n4. Within a few seconds the Replyflow AI assistant replies in Messenger, and the conversation appears in the Inbox of Replyflow AI.\n5. In Channels press "Disconnect" to remove the Page.\nPrivacy Policy: ${site()}/privacy - Data deletion: ${site()}/data-deletion`],
+];
+
+const SCRIPT = [
+  "Start on the Replyflow AI Sign in page. Say or show: \"Shop owners sign in with Facebook.\" Press Continue with Facebook.",
+  "Show the Facebook window asking for the permissions. Tick your Page and press Continue.",
+  "You land on Channels showing “Connected — [Page name]”. Pause 2 seconds on it.",
+  "On your phone (a different Facebook account), open the Page in Messenger and send: “Hi, what do you sell?”.",
+  "Show the AI reply arriving in Messenger on the phone.",
+  "Back on the computer, open Inbox and click the conversation — show the customer message and the AI reply.",
+  "Go to Channels and press Disconnect, to show the owner can remove the Page. Stop recording (about 2 minutes total).",
+];
+
+function ReviewKit() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-t border-border pt-4 space-y-3" data-testid="review-kit">
+      <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary" data-testid="review-kit-toggle">
+        <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} /> {open ? "Hide" : "Show"} Meta App Review answers (copy & paste)
+      </button>
+      {open && (
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">In your Meta app open <b>App Review → Permissions and features</b>. For each permission below press <b>Request advanced access</b>, paste the text, and attach the same screen recording.</p>
+          {REVIEW().map(([name, text]) => (
+            <div key={name} className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-xs font-semibold">{name}</code>
+                <button onClick={() => { navigator.clipboard.writeText(text); toast.success(`Copied ${name}`); }} data-testid={`review-copy-${name.replace(/\s+/g, "-")}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted/60"><Copy className="h-3.5 w-3.5" /> Copy</button>
+              </div>
+              <p className="whitespace-pre-line rounded-lg bg-muted/50 border border-border px-3 py-2 text-xs leading-relaxed text-foreground/80">{text}</p>
+            </div>
+          ))}
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Screen recording (about 2 minutes, one video for all permissions)</p>
+            <ol className="list-decimal pl-5 space-y-1.5 text-sm text-muted-foreground marker:font-semibold" data-testid="review-script">
+              {SCRIPT.map((s2) => <li key={s2}>{s2}</li>)}
+            </ol>
+            <p className="text-xs text-muted-foreground">Tips: record in English (or add English captions), show the full browser address bar, and make sure the Page you use is published.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Platform admin only: the one-time Meta app setup that switches on the button for every shop. */
 export function MetaSetupCard({ Section }) {
@@ -325,6 +380,7 @@ export function MetaSetupCard({ Section }) {
             </li>
           </ol>
         )}
+        <ReviewKit />
         {!d.ready && <p className="text-xs text-muted-foreground">If you publish the app, open this card on the live site and use the addresses shown there instead of the ones above.</p>}
       </div>
     </Section>

@@ -229,3 +229,8 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - PUT /settings: non-superadmin can't change fb_* fields (stale forms can't wipe a connection)
 - Channels: blue button + "Or paste your Page token — like Telegram" (2 fields + Connect + 4-step how-to with our /privacy URL); connected card shows "with your Page token" (no Change page)
 - tests/check_facebook_token.py (Graph STUBBED) all pass; real Graph rejects a bad token with the friendly message; UI desktop + 390 ok
+
+## Iteration 29 (2026-10) — Clients: one button only + Meta App Review kit
+- Clients see only "Connect with Facebook" (+ note: "Feature Unavailable" = waiting for Meta approval); Page-token box only for platform admin or shops already connected by token
+- Admin MetaSetupCard → "Show Meta App Review answers": copy-ready texts for pages_show_list, pages_messaging, pages_manage_metadata, public_profile, email, reviewer test steps (uses current site URL) + 7-step ~2-min screen-recording script
+- Approval path for user: Business verification → Become a Tech Provider → App Review (Advanced access) → Live. Recommend publishing the site first so Meta reviews the permanent URL
