@@ -36,6 +36,10 @@ async def set_att_status(order_ids: list, status: str):
 
 
 def order_problem(items: list) -> str:
+    for p, qty in items:
+        left = p.get("stock")
+        if left is not None and qty > left:
+            return f"'{p['name']}' is sold out" if left <= 0 else f"only {left} of '{p['name']}' are left, so the customer can order at most {left}"
     prices = [P.parse_price(p.get("price", "")) for p, _ in items]
     if not all(prices):
         return "some of these products have no single exact price (e.g. a price range), so a team member must confirm the price first"
@@ -84,6 +88,9 @@ async def settle_order(order: dict, by: str) -> bool:
                                                {"$set": {"status": "paid", "paid_at": now_iso(), "paid_by": by, "updated_at": now_iso()}}):
         return False
     await set_att_status([order["id"]], "paid")
+    for it in order.get("items", []):  # paid: take the sold units out of stock (products without stock tracking are skipped)
+        await db.products.update_one({"id": it["product_id"], "business_id": order["business_id"], "stock": {"$type": "number"}},
+                                     [{"$set": {"stock": {"$max": [0, {"$subtract": ["$stock", it["qty"]]}]}}}])
     conv = await db.conversations.find_one({"id": order["conversation_id"]}, {"_id": 0})
     if not conv:
         return True

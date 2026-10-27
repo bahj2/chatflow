@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { Plus, Trash2, Save, Sparkles, Loader2, Lock, Settings2 } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, Loader2, Lock, Settings2, Store, Bot, BookOpen, QrCode, Users } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
+const TABS = [["business", "Business", Store], ["ai", "AI & voice", Bot], ["knowledge", "Knowledge", BookOpen], ["payments", "Payments", QrCode], ["team", "Team", Users]];
 import { toast } from "sonner";
 import { api, errMsg, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
@@ -67,6 +70,7 @@ const Tester = () => {
 export default function SettingsPanel() {
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState("business");
   const [newEmail, setNewEmail] = useState("");
   const { billing } = useBilling();
   const { user } = useAuth();
@@ -101,6 +105,11 @@ export default function SettingsPanel() {
           </button>
         </PageHeader>
 
+        <Tabs value={tab} onValueChange={setTab} className="mt-6">
+          <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-2xl bg-muted/60 p-1" data-testid="settings-tabs">
+            {TABS.map(([k, l, Icon]) => <TabsTrigger key={k} value={k} data-testid={`settings-tab-${k}`} className="rounded-xl px-4 py-2 gap-2 data-[state=active]:shadow-sm"><Icon className="h-4 w-4" />{l}</TabsTrigger>)}
+          </TabsList>
+          <TabsContent value="business" className="mt-0">
         <Section title="Business" desc="What you do, what you sell, prices, hours, delivery, policies.">
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Business name"><Input value={s.business_name} onChange={set("business_name")} data-testid="business-name-input" /></Field>
@@ -124,7 +133,6 @@ export default function SettingsPanel() {
           </div>
           <p className="text-xs text-muted-foreground/80">Each shop has its own seller name, greeting and cloned voice (AI Settings → Voice). Leave the greeting empty to let the AI answer the first message directly.</p>
         </Section>
-
         <Section title="FAQs" desc="Common questions and the exact answers you want the AI to use.">
           {s.faqs.map((f, i) => (
             <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2" data-testid={`faq-item-${i}`}>
@@ -138,14 +146,54 @@ export default function SettingsPanel() {
           <button onClick={() => setS({ ...s, faqs: [...s.faqs, { q: "", a: "" }] })} data-testid="add-faq-btn"
             className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
         </Section>
-
+        <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
+          {s.quick_replies.map((r, i) => (
+            <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2" data-testid={`quick-item-${i}`}>
+              <div className="flex gap-2">
+                <Input value={r.label} onChange={(e) => setQr(i, "label", e.target.value)} placeholder="Button label, e.g. Prices" data-testid={`quick-label-${i}`} />
+                <button onClick={() => setS({ ...s, quick_replies: s.quick_replies.filter((_, j) => j !== i) })} data-testid={`quick-delete-${i}`} className="text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              <Textarea rows={2} value={r.text} onChange={(e) => setQr(i, "text", e.target.value)} placeholder="Message that will be sent" data-testid={`quick-text-${i}`} />
+            </div>
+          ))}
+          <button onClick={() => setS({ ...s, quick_replies: [...s.quick_replies, { label: "", text: "" }] })} data-testid="add-quick-btn"
+            className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
+        </Section>
+          </TabsContent>
+          <TabsContent value="ai" className="mt-0">
+        <Section title="AI behaviour" desc="Model, tone and language for every reply.">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Field label="AI model">
+              <Pick value={s.model} onChange={set("model")} testid="model-select" items={[["luna", "GPT 6 Luna (fast, low cost)"], ["claude", "Claude Sonnet 4.5"], ["gemini", "Gemini 3 Flash"]]} />
+            </Field>
+            <Field label="Tone">
+              <Pick value={s.tone} onChange={set("tone")} testid="tone-select" items={[["friendly", "Friendly"], ["professional", "Professional"], ["direct", "Short & direct"], ["witty", "Witty"]]} />
+            </Field>
+            <Field label="Reply language">
+              <Pick value={s.language} onChange={set("language")} testid="language-select"
+                items={[["auto", "Same as customer"], ["English", "English"], ["Russian", "Russian"], ["Ukrainian", "Ukrainian"], ["Spanish", "Spanish"], ["Vietnamese", "Vietnamese"], ["Thai", "Thai"]]} />
+            </Field>
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 p-4">
+            <div><p className="font-medium text-sm">Auto-reply on all channels</p><p className="text-xs text-muted-foreground">Turn off to only use suggested replies.</p></div>
+            <Switch checked={s.auto_reply} onCheckedChange={set("auto_reply")} data-testid="auto-reply-switch" />
+          </div>
+          <Field label="Try it (save first to test new info)"><Tester /></Field>
+        </Section>
+        {pro === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
+          text="Voice replies and the seller voice clone are included in the Pro and Business plans." />
+          : <VoiceSection owner={owner} s={s} setS={setS} Section={Section} Field={Field} />}
+          </TabsContent>
+          <TabsContent value="knowledge" className="mt-0">
         {pro === false ? <Locked title="Notion knowledge" desc="Let the AI read your Notion pages — shop info, FAQs, prices and policies." what="Notion knowledge" testid="pro-lock-notion" />
           : owner ? <NotionSection Section={Section} />
           : <Section title="Notion knowledge" desc="Let the AI read your Notion pages."><OwnerOnly testid="owner-only-notion" /></Section>}
-
+          </TabsContent>
+          <TabsContent value="payments" className="mt-0">
         {owner ? <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
           : <Section title="Bakong KHQR payments" desc="Where customers' order payments go."><OwnerOnly testid="owner-only-payments" /></Section>}
-
+          </TabsContent>
+          <TabsContent value="team" className="mt-0">
         {!owner ? <Section title="Team access" desc="Who can sign in to this shop."><OwnerOnly testid="owner-only-team" /></Section> : (
         <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own). Removing an email signs that teammate out right away.">
           {team && <p className="text-xs text-muted-foreground" data-testid="team-limit">Your plan includes {team >= 1000 ? "unlimited" : team} login{team === 1 ? "" : "s"} (you{team > 1 ? ` + ${team >= 1000 ? "any number of" : team - 1} teammate${team === 2 ? "" : "s"}` : ""}).</p>}
@@ -166,44 +214,8 @@ export default function SettingsPanel() {
           </div>
         </Section>
         )}
-
-        <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
-          {s.quick_replies.map((r, i) => (
-            <div key={i} className="rounded-xl border border-border bg-muted/40 p-4 space-y-2" data-testid={`quick-item-${i}`}>
-              <div className="flex gap-2">
-                <Input value={r.label} onChange={(e) => setQr(i, "label", e.target.value)} placeholder="Button label, e.g. Prices" data-testid={`quick-label-${i}`} />
-                <button onClick={() => setS({ ...s, quick_replies: s.quick_replies.filter((_, j) => j !== i) })} data-testid={`quick-delete-${i}`} className="text-muted-foreground/80 hover:text-red-600 dark:hover:text-red-400 px-2"><Trash2 className="h-4 w-4" /></button>
-              </div>
-              <Textarea rows={2} value={r.text} onChange={(e) => setQr(i, "text", e.target.value)} placeholder="Message that will be sent" data-testid={`quick-text-${i}`} />
-            </div>
-          ))}
-          <button onClick={() => setS({ ...s, quick_replies: [...s.quick_replies, { label: "", text: "" }] })} data-testid="add-quick-btn"
-            className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
-        </Section>
-
-        {pro === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
-          text="Voice replies and the seller voice clone are included in the Pro and Business plans." />
-          : <VoiceSection owner={owner} s={s} setS={setS} Section={Section} Field={Field} />}
-
-        <Section title="AI behaviour" desc="Model, tone and language for every reply.">
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Field label="AI model">
-              <Pick value={s.model} onChange={set("model")} testid="model-select" items={[["luna", "GPT 6 Luna (fast, low cost)"], ["claude", "Claude Sonnet 4.5"], ["gemini", "Gemini 3 Flash"]]} />
-            </Field>
-            <Field label="Tone">
-              <Pick value={s.tone} onChange={set("tone")} testid="tone-select" items={[["friendly", "Friendly"], ["professional", "Professional"], ["direct", "Short & direct"], ["witty", "Witty"]]} />
-            </Field>
-            <Field label="Reply language">
-              <Pick value={s.language} onChange={set("language")} testid="language-select"
-                items={[["auto", "Same as customer"], ["English", "English"], ["Russian", "Russian"], ["Ukrainian", "Ukrainian"], ["Spanish", "Spanish"], ["Vietnamese", "Vietnamese"], ["Thai", "Thai"]]} />
-            </Field>
-          </div>
-          <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 p-4">
-            <div><p className="font-medium text-sm">Auto-reply on all channels</p><p className="text-xs text-muted-foreground">Turn off to only use suggested replies.</p></div>
-            <Switch checked={s.auto_reply} onCheckedChange={set("auto_reply")} data-testid="auto-reply-switch" />
-          </div>
-          <Field label="Try it (save first to test new info)"><Tester /></Field>
-        </Section>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

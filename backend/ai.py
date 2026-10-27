@@ -31,8 +31,11 @@ def catalog_text(products: list, payments: bool = False) -> str:
     def pay_note(p):
         pr = P.parse_price(p.get("price", ""))
         return f" [{pr[1]}]" if pr else " [no exact price: cannot be paid by QR]"
-    rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'}{pay_note(p) if payments else ''} | {(p.get('description') or '')[:160]}" for p in products)
-    return ("\n\nPRODUCT CATALOG (live and always up to date; it overrides anything said earlier in the conversation) (ref | name | price | description):\n" + rows +
+    def stock(p):
+        n = p.get("stock")
+        return "in stock" if n is None else "SOLD OUT" if n <= 0 else f"{n} left"
+    rows = "\n".join(f"{p['id'][:8]} | {p['name']} | {p.get('price') or '-'}{pay_note(p) if payments else ''} | {p.get('category') or '-'} | {stock(p)} | {(p.get('description') or '')[:160]}" for p in products)
+    return ("\n\nPRODUCT CATALOG (live and always up to date; it overrides anything said earlier in the conversation) (ref | name | price | category | stock | description):\n" + rows +
             "\n\nProduct rules:\n"
             "- When the customer asks what you sell, about a product, prices or availability, answer right away from this catalog with product names and prices. "
             "Never say a team member will follow up or that you have no product details when the catalog answers it, even if earlier assistant messages said so.\n"
@@ -41,7 +44,8 @@ def catalog_text(products: list, payments: bool = False) -> str:
             "- Specific question (one product, type, budget): tag up to 3 best matches. General question (\"what do you sell?\", \"show me your products\"): "
             "briefly name what you have and tag ALL products (max 10).\n"
             "- If the message is not about products, add no tag.\n"
-            "- Write product lists as plain sentences or simple lines, never with ** or markdown."
+            "- Write product lists as plain sentences or simple lines, never with ** or markdown.\n"
+            "- STOCK: a SOLD OUT product can't be bought right now: say so kindly and suggest a similar product that is in stock. Never sell more units than are left."
             + ("\n- PAYMENT: when the customer clearly confirms they want to buy (which product and how many), END your reply with a tag like "
                "[[order:ref1*2,ref2*1]] (ref*quantity, only refs that exist). A Bakong KHQR payment QR for the exact total is sent automatically: "
                "tell them the total and that they can scan it with any Cambodian bank app (ABA, ACLEDA, Wing, Bakong...) within 10 minutes. "

@@ -20,6 +20,12 @@ class ProductIn(BaseModel):
     price: str = Field(default="", max_length=40)
     description: str = Field(default="", max_length=1000)
     image_media_id: str = ""
+    category: str = Field(default="", max_length=40)
+    stock: Optional[int] = Field(default=None, ge=0, le=1_000_000)  # None = stock not tracked
+
+
+class StockIn(BaseModel):
+    stock: Optional[int] = Field(default=None, ge=0, le=1_000_000)
 
 @router.get("/orders")
 async def list_orders(status: Optional[Literal["pending", "paid", "expired", "cancelled"]] = None, user=Depends(current_user)):
@@ -115,6 +121,14 @@ async def create_product(body: ProductIn, user=Depends(current_user)):
 async def update_product(pid: str, body: ProductIn, user=Depends(current_user)):
     flt = {"id": pid, "business_id": user["business_id"], "is_deleted": False}
     if not (await db.products.update_one(flt, {"$set": body.model_dump()})).matched_count:
+        raise HTTPException(404, "Product not found")
+    return await db.products.find_one(flt, {"_id": 0})
+
+
+@router.patch("/products/{pid}/stock")
+async def set_stock(pid: str, body: StockIn, user=Depends(current_user)):
+    flt = {"id": pid, "business_id": user["business_id"], "is_deleted": False}
+    if not (await db.products.update_one(flt, {"$set": {"stock": body.stock}})).matched_count:
         raise HTTPException(404, "Product not found")
     return await db.products.find_one(flt, {"_id": 0})
 
