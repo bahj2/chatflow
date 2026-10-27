@@ -194,3 +194,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Frontend components/FacebookConnect.jsx: FacebookConnect (button, page picker, auto-connect when only 1 page, connected card with Change page / Disconnect, manual setup under "Advanced") + MetaSetupCard (admin-only 7-step guide with copy boxes) in Channels
 - Verified: tests/check_facebook_connect.py (Graph STUBBED) all steps pass; UI screenshots desktop + 390; manual Messenger flow still works (tests/check_messenger_flow.py)
 - NOT tested against real Meta (no app yet). Meta requires a Privacy Policy URL; App Review + Business verification needed before non-tester shops can connect
+
+## Iteration 24 (2026-10) — Facebook live with real Meta app
+- Real Meta app "Replyflow AI" (App ID in META_APP_ID) — keys verified; connected Page "Replyflow AI" to Vaa's business; real customer (SanVan Sambath) messages → AI replies delivered (messenger send 200, text + product image) after app published Live
+- Fixes: page tokens taken from /me/accounts (no pages_read_engagement needed); Channels auto-finishes a pending Page pick even if ?fb=pick is lost (status.pending); httpx INFO logging off (tokens in URLs); POST /api/admin/meta-setup/webhook registers app Page webhook via Graph (/{app}/subscriptions) + status in admin card
+- Public /privacy, /terms, /data-deletion pages (Legal.jsx, contact mond24036@gmail.com) + landing footer links — required by Meta to publish
+- Manual Messenger setup hidden from shops (only platform admin, or shops already using it)
+- Still needed for OTHER shops' Pages: Business verification + App Review (Advanced Access for pages_show_list, pages_messaging, pages_manage_metadata). Preview URL used in Meta; after deploy update redirect URI + press "Set up message webhook" on live site

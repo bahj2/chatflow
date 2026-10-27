@@ -65,7 +65,7 @@ export default function ChannelsPanel() {
         </Section>
 
         <Section title={<Head Icon={Facebook} color="#0084FF" name="Messenger" />} desc="Connect your Facebook Page so Messenger chats land in your Inbox and the AI answers them.">
-          <FacebookConnect owner={owner} manualConfigured={!!st?.messenger.manual} onChanged={refresh} manual={<>
+          <FacebookConnect owner={owner} manualConfigured={!!st?.messenger.manual} allowManual={user.role === "superadmin"} onChanged={refresh} manual={<>
             <Status ok={st?.messenger.manual} label="Configured" />
             <p className="text-xs text-muted-foreground">In Meta for Developers: create an app → add Messenger → generate a Page access token → set the webhook below with your verify token, subscribe to &apos;messages&apos;.</p>
             <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger/${user.business_id}`} testid="messenger-callback-url" /></Field>

@@ -22,7 +22,8 @@ const FbButton = ({ onClick, busy, disabled, label, testid }) => (
 );
 
 /** Shop side: one click to log in with Facebook, pick the Page, done. Manual token setup stays available as "advanced". */
-export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) {
+/** allowManual: only the platform admin sees the manual (own Meta app) setup; shops that already use it keep it. */
+export function FacebookConnect({ owner, manual, manualConfigured, allowManual, onChanged }) {
   const [meta, setMeta] = useState(null);
   const [pages, setPages] = useState(null);
   const [pick, setPick] = useState("");
@@ -79,6 +80,7 @@ export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) 
 
   if (!meta) return <div className="text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Checking Facebook…</div>;
   const manualOpen = showManual || manualConfigured || !meta.available;
+  const canManual = allowManual || manualConfigured;
 
   return (
     <div className="space-y-4" data-testid="fb-connect">
@@ -131,10 +133,10 @@ export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) 
           <p className="text-xs text-muted-foreground">Log in to Facebook, tick your Page, press Continue — that’s it. You need to be an admin of the Page.</p>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground" data-testid="fb-not-available">One-click “Connect with Facebook” isn’t switched on yet. You can connect manually below.</p>
+        <p className="text-sm text-muted-foreground" data-testid="fb-not-available">One-click “Connect with Facebook” is coming soon.{canManual ? " You can connect manually below." : " Please contact Replyflow AI support to connect your Page."}</p>
       )}
 
-      {owner && !meta.connected && manual && (
+      {owner && !meta.connected && manual && canManual && (
         <div className="border-t border-border pt-4">
           {meta.available && !manualConfigured && (
             <button onClick={() => setShowManual((v) => !v)} data-testid="fb-manual-toggle" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
