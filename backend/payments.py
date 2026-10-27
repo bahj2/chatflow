@@ -142,8 +142,14 @@ def convert(amount: float, currency: str, to: str) -> tuple:
     return round(amount / USD_KHR, 2), "USD"
 
 
+_store_currency: dict = {}  # token -> the only currency its KHQR.dev store accepts (learned from its error)
+
+
 def _relay_any(token: str, amount: float, currency: str, bill: str) -> tuple:
     """A KHQR.dev store may accept only KHR (or only USD): then charge the same price in the store's currency."""
+    only = _store_currency.get(token)
+    if only:
+        amount, currency = convert(amount, currency, only)
     try:
         return (*_relay_qr(token, amount, currency, bill), amount, currency)
     except PaymentError as e:
@@ -151,6 +157,7 @@ def _relay_any(token: str, amount: float, currency: str, bill: str) -> tuple:
         other = "KHR" if "KHR store" in msg else "USD" if "USD store" in msg else None
         if not other or other == currency:
             raise
+        _store_currency[token] = other
         amount, currency = convert(amount, currency, other)
         return (*_relay_qr(token, amount, currency, bill), amount, currency)
 

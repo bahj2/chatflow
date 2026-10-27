@@ -95,6 +95,8 @@ def member(shop, admin):
              fb_page_token="", fb_app_secret="TESTSECRET", fb_verify_token="TESTVERIFY", khqr_token="rbkTESTTOKEN")
     r = requests.put(f"{API}/settings", headers=H(shop["tok"]), json=s)
     assert r.status_code == 200, r.text
+    # Facebook secrets are no longer set through PUT /settings by shops (only the Connect flows): seed them directly
+    DB.settings.update_one({"business_id": shop["bid"]}, {"$set": {"fb_app_secret": "TESTSECRET", "fb_verify_token": "TESTVERIFY"}})
     DB.users.insert_one({"id": str(uuid.uuid4()), "email": MEM_EMAIL, "role": "member", "business_id": shop["bid"],
                          "password_hash": bcrypt.hashpw(b"member123", bcrypt.gensalt()).decode(), "created_at": "x"})
     r = requests.post(f"{API}/auth/login", json={"email": MEM_EMAIL, "password": "member123"})

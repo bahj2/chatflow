@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, Check, Loader2, Plus, QrCode, CheckCircle2, Clock, Infinity as InfinityIcon, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
-import { useBilling, PLAN_FEATURES } from "@/lib/billing";
+import { useBilling, PLAN_FEATURES, money } from "@/lib/billing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const day = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -110,7 +110,7 @@ const PayDialog = ({ inv, onClose, onPaid }) => {
       <DialogContent className="max-w-sm" data-testid="billing-pay-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5 text-rose-600" /> Pay with Bakong KHQR</DialogTitle>
-          <DialogDescription>{cur.item_name} · <b className="text-foreground">${cur.amount.toFixed(2)}</b> · invoice {cur.number}</DialogDescription>
+          <DialogDescription>{cur.item_name} · <b className="text-foreground">{money(cur.amount, cur.currency)}</b> · invoice {cur.number}</DialogDescription>
         </DialogHeader>
         {cur.status === "paid" ? (
           <div className="py-6 text-center space-y-2" data-testid="billing-pay-success">
@@ -140,7 +140,7 @@ const History = ({ invoices }) => invoices.length > 0 && (
       <tbody>
         {invoices.map((i) => (
           <tr key={i.id} className="border-t border-border/60" data-testid={`billing-invoice-${i.id}`}>
-            <td className="px-5 py-3 font-mono text-xs">{i.number}</td><td className="px-5 py-3">{i.item_name}</td><td className="px-5 py-3">${i.amount.toFixed(2)}</td>
+            <td className="px-5 py-3 font-mono text-xs">{i.number}</td><td className="px-5 py-3">{i.item_name}</td><td className="px-5 py-3">{money(i.amount, i.currency)}</td>
             <td className="px-5 py-3"><Pill cls={STATUS[i.status] || STATUS.expired}>{i.status}</Pill></td><td className="px-5 py-3 text-muted-foreground">{day(i.created_at)}</td>
           </tr>
         ))}

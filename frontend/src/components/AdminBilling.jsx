@@ -5,6 +5,7 @@ import { api, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { money } from "@/lib/billing";
 
 const PLANS = [["starter", "Starter"], ["pro", "Pro"], ["business", "Business"]];
 const RECENT_MS = 48 * 3600 * 1000;
@@ -57,7 +58,7 @@ export const SetPlanDialog = ({ b, onClose, onDone }) => {
 const InvoiceRow = ({ i, armed, onConfirm }) => (
   <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3" data-testid={`admin-invoice-${i.id}`}>
     <div className="flex-1 min-w-[180px]">
-      <p className="text-sm font-semibold">{i.business_name || "Unknown shop"} · ${i.amount.toFixed(2)}</p>
+      <p className="text-sm font-semibold">{i.business_name || "Unknown shop"} · {money(i.amount, i.currency)}</p>
       <p className="text-xs text-muted-foreground">{i.item_name} · <span className="font-mono">{i.number}</span> · {when(i.created_at)}{i.status === "expired" ? " · QR expired" : ""}</p>
     </div>
     <button onClick={() => onConfirm(i)} data-testid={`admin-invoice-confirm-${i.id}`}

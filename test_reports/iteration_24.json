@@ -1,0 +1,38 @@
+{
+  "summary": "Backend-only test of the KHQR.dev KHR-only store currency fix and the per-token rate-limit fix. All requested checks PASS (7/7 new tests). BUG FIX 1: POST /api/payments/preview for a new shop using the real KHR-only rbk token returns 200, mode 'relay', PNG media and a deeplink. BUG FIX 1b: convert(1,'USD','KHR')==(4100.0,'KHR') and convert(41000,'KHR','USD')==(10.0,'USD'). make_qr(25 USD) gives 102500.0 KHR in relay mode, and make_qr(40000 KHR) leaves 40000 KHR unchanged. BUG FIX 1c: create_order gives total 102500 KHR, price_total 25.0 USD and mode relay, and the caption contains '102,500៛ ($25.00)'. BUG FIX 2: 3 QRs made back to back (make_qr, make_qr, create_order) all succeed in 4.8s, 4.0s and 5.4s, with no 'Rate limit exceeded' while the server's payment poll uses the same token. The backend log has 0 'rate limit' lines. REGRESSION: a shop with only an account ID gets mode 'local' from the preview. Founder Billing checkout gives a $10 USD Starter invoice whose QR contains tit_sambath@bkrt (mode 'local', see the BAKONG_TOKEN note). A shop saving an eyJ token gets 400 ('must start with rbk'). The founder saving an expired eyJ token gets 400 with 'expired on'. Serial runs: iter21 28/28, iter23 9/9, iter22 13/14 (the 1 failure is a stale test, not from this change). All 4 /app/tests/check_facebook_*.py scripts pass. About 12 real KHQR.dev calls were made in total. Vaa's settings were only read, never written, and all test shops, orders and media were deleted.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "BAKONG_TOKEN secret / platform_settings()", "issue": "The founder's BAKONG_TOKEN expired on 06 Jun 2026 (the server clock says 2026-10-27). jwt_valid() is False, so founder invoices are mode 'local' and payments are not checked automatically: they must be confirmed by hand. The token needs renewing."},
+      {"endpoint": "billing.checkout", "issue": "Ignores qr['amount']/qr['currency']. If the founder ever uses a KHR-only rbk token, the invoice is saved as $10 USD while the QR asks for 41,000 KHR. Not triggered today because the founder uses an eyJ token or a local QR."},
+      {"endpoint": "payments._relay_any", "issue": "Every QR for a KHR-only store first tries USD and fails. That wastes one KHQR.dev call and adds about 1.1s each time (3 calls per QR, 4 for the preview). Remember the store's currency per token after the first 'KHR store' error."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter24_khqr_currency_unit.py",
+    "/app/backend/tests/test_iter24_khqr_currency_live.py",
+    "/app/test_reports/pytest/pytest_iter24_regression.xml"
+  ],
+  "action_items": [
+    "Renew the founder's BAKONG_TOKEN (expired 06 Jun 2026) so subscription invoices are checked automatically again",
+    "Optional: cache the detected store currency per relay token in _relay_any so the failing first call isn't repeated",
+    "Optional: in billing.checkout, save the QR's real amount/currency (or refuse KHR-only stores) so the invoice matches the QR",
+    "Update the stale test test_iter22_team_security.py::test_member_put_cannot_change_owner_fields: since the Facebook change, a non-superadmin owner cannot set fb_app_secret/fb_verify_token through PUT /settings, so the test fixture no longer saves 'TESTSECRET'",
+    "Many older suites (iter4-iter17, test_replyflow_api) are stale. They use server.P, server.httpx and server.get_settings, which moved out of server.py when it was split into modules. Some need /tmp fixtures or the removed web chat. Running them all in parallel also hits the signup/login rate limit (429). Delete or update them."
+  ],
+  "critical_code_review_comments": [
+    "_relay_call sleeps while holding a per-token threading.Lock inside asyncio.to_thread. When several shops are being rate-limited at once, the default thread pool can fill up with sleeping threads. Acceptable at the current scale.",
+    "Rate spacing is per process (the _last dict is in memory). With more than one uvicorn worker or process, the 1 req/s limit is not shared. The single retry covers this today.",
+    "khqr_att amount_text shows only the KHR amount. The USD price appears only in the caption. Consider adding price_total there too."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter24_khqr_currency_unit.py",
+    "/app/backend/tests/test_iter24_khqr_currency_live.py"
+  ],
+  "success_rate": {"backend": "100% of requested checks (7/7 new tests; iter21 28/28, iter23 9/9, iter22 13/14 stale test, facebook checks 4/4)", "frontend": "not tested (backend only)"},
+  "seed_data_creation": "Temporary shops test_i24khr_*/test_i24loc_* and in-process orders for business TEST_iter24_*. All were deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run serially: pytest tests/test_iter24_khqr_currency_unit.py tests/test_iter24_khqr_currency_live.py -n0. The unit test loads backend/.env and makes about 8 real KHQR.dev calls. The live test copies Vaa's token into a temporary shop via Mongo (about 4 calls). Never print the token. Clear db.rate_hits between suites (signup/login rate limit). Do not run the whole tests/ folder together: most pre-iter21 suites are stale."
+}

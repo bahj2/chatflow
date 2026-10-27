@@ -153,8 +153,9 @@ async def checkout(db, bid: str, item: str, ps) -> dict:
     except P.PaymentError as e:
         raise HTTPException(503, f"Payment QR could not be created: {e}")
     t = now()
-    inv = {"id": str(uuid.uuid4()), "number": number, "business_id": bid, "item": item, "item_name": name, "amount": float(amount),
-           "currency": "USD", "status": "pending", "mode": qr["mode"], "md5": qr["md5"], "qr": qr["qr"], "deeplink": qr["deeplink"],
+    inv = {"id": str(uuid.uuid4()), "number": number, "business_id": bid, "item": item, "item_name": name,
+           "amount": float(qr["amount"]), "currency": qr["currency"],  # what the QR asks for (KHR if the store takes only riel)
+           "price_usd": float(amount), "status": "pending", "mode": qr["mode"], "md5": qr["md5"], "qr": qr["qr"], "deeplink": qr["deeplink"],
            "created_at": iso(t), "expires_at": iso(t + timedelta(minutes=P.QR_MINUTES))}
     await db.invoices.insert_one(dict(inv))
     return inv_view(inv)

@@ -16,6 +16,10 @@ export const BillingProvider = ({ children }) => {
 
 export const useBilling = () => useContext(BillingCtx);
 
+// Invoice amount in its own currency (KHR when the founder's KHQR.dev store accepts only riel)
+export const money = (amount, currency = "USD") =>
+  currency === "KHR" ? `${Math.round(amount).toLocaleString("en-US")}៛` : `$${Number(amount).toFixed(2)}`;
+
 // true / false once known, undefined while loading
 export const usePro = () => useContext(BillingCtx).billing?.sub.pro;
 
