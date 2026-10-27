@@ -9,10 +9,10 @@ from pymongo.errors import DuplicateKeyError
 import payments as P
 
 PLANS = {
-    "trial": {"name": "Free trial", "price": 0, "replies": 200, "days": 14, "team": 1, "pro": False},
-    "starter": {"name": "Starter", "price": 10, "replies": 1000, "days": 30, "team": 1, "pro": False},
-    "pro": {"name": "Pro", "price": 25, "replies": 3000, "days": 30, "team": 3, "pro": True},
-    "business": {"name": "Business", "price": 59, "replies": 8000, "days": 30, "team": 10, "pro": True},
+    "trial": {"name": "Free trial", "price": 0, "replies": 200, "days": 14, "team": 3, "pro": True, "voice": False},  # Pro features except voice-to-voice
+    "starter": {"name": "Starter", "price": 10, "replies": 1000, "days": 30, "team": 1, "pro": False, "voice": False},
+    "pro": {"name": "Pro", "price": 25, "replies": 3000, "days": 30, "team": 3, "pro": True, "voice": True},
+    "business": {"name": "Business", "price": 59, "replies": 8000, "days": 30, "team": 10, "pro": True, "voice": True},
 }
 PAID = ("starter", "pro", "business")
 TOPUP = {"replies": 1000, "price": 5}
@@ -71,6 +71,7 @@ def view(sub: dict) -> dict:
             "period_end": sub["period_end"], "paid_until": sub["paid_until"], "days_left": max(0, math.ceil((paid - t).total_seconds() / 86400)),
             "used": sub["used"], "limit": sub["limit"], "extra": sub["extra"], "extra_used": sub.get("extra_used", 0), "active": active,
             "paused": bool(reason), "reason": reason, "pro": sub["exempt"] or (plan["pro"] and active),
+            "voice": sub["exempt"] or (plan["voice"] and active),
             "team": 1000 if sub["exempt"] else plan["team"] if active else 1, "exempt": sub["exempt"]}
 
 
@@ -79,8 +80,8 @@ async def sub_status(db, bid: str) -> dict:
 
 
 def effective(s, v: dict):
-    """Settings with Pro-only extras (voice replies, seller voice clone) switched off for shops without Pro."""
-    return s if v["pro"] else s.model_copy(update={"voice_replies": False, "seller_voice_media_id": "", "seller_voice_text": ""})
+    """Settings with paid-Pro extras (voice replies, seller voice clone) switched off for shops without them (incl. the free trial)."""
+    return s if v["voice"] else s.model_copy(update={"voice_replies": False, "seller_voice_media_id": "", "seller_voice_text": ""})
 
 
 def auto_confirm(ps) -> bool:

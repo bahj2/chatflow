@@ -168,6 +168,10 @@ async def require_pro(bid: str):
     if not (await B.sub_status(db, bid))["pro"]:
         raise HTTPException(402, B.PRO_ONLY)
 
+async def require_voice(bid: str):
+    if not (await B.sub_status(db, bid))["voice"]:
+        raise HTTPException(402, "Voice replies and the seller voice clone are included in the paid Pro and Business plans.")
+
 PROXY_HOPS = 2  # Cloudflare + load balancer append after the real client IP
 
 

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { NavLink, Routes, Route, Link, Navigate } from "react-router-dom";
-import { Inbox as InboxIcon, Settings2, Plug, LogOut, ExternalLink, Building2, Package, Receipt, CreditCard, PauseCircle } from "lucide-react";
+import { Inbox as InboxIcon, Settings2, Plug, LogOut, ExternalLink, Building2, Package, Receipt, CreditCard, PauseCircle, PlayCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TourVideo } from "@/components/LandingPricing";
 import { BrandMark, BRAND } from "@/components/Brand";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/lib/auth";
@@ -48,6 +51,19 @@ const PausedBanner = () => {
 
 const item = "relative flex items-center gap-3 rounded-xl px-2.5 md:px-3 py-2.5 text-sm font-medium transition-colors";
 
+const TutorialButton = () => {
+  const [open, setOpen] = useState(false);
+  return (<>
+    <button onClick={() => setOpen(true)} title="Watch tutorial" data-testid="nav-tutorial-btn" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors"><PlayCircle className="h-[18px] w-[18px]" /></button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-3xl p-3" data-testid="tutorial-dialog">
+        <DialogHeader className="px-2 pt-1"><DialogTitle className="font-display">How to use Replyflow AI</DialogTitle></DialogHeader>
+        <TourVideo />
+      </DialogContent>
+    </Dialog>
+  </>);
+};
+
 const BusinessCard = ({ name }) => (
   <div className="hidden lg:flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2.5 mb-5" data-testid="dash-business-name">
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand font-display font-bold text-white">{(name || "?").trim()[0]?.toUpperCase()}</span>
@@ -94,6 +110,7 @@ export default function Dashboard() {
           <a href="/" target="_blank" rel="noreferrer" title="View website" className={`hidden md:flex ${item} text-muted-foreground hover:text-foreground hover:bg-muted/70 lg:flex-1`} data-testid="nav-view-site">
             <ExternalLink className="h-[18px] w-[18px]" /><span className="hidden lg:inline">Website</span>
           </a>
+          <TutorialButton />
           <ThemeToggle />
         </div>
         <button onClick={logout} data-testid="logout-btn" title="Log out" className={`${item} shrink-0 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10`}>

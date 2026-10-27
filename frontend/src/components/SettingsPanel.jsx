@@ -180,8 +180,8 @@ export default function SettingsPanel() {
           </div>
           <Field label="Try it (save first to test new info)"><Tester /></Field>
         </Section>
-        {pro === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
-          text="Voice replies and the seller voice clone are included in the Pro and Business plans." />
+        {billing?.sub.voice === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
+          text="Voice replies and the seller voice clone are included in the paid Pro and Business plans." />
           : <VoiceSection owner={owner} s={s} setS={setS} Section={Section} Field={Field} />}
           </TabsContent>
           <TabsContent value="knowledge" className="mt-0">

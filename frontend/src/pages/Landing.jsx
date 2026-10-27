@@ -3,6 +3,7 @@ import { ArrowRight, Send, Facebook, QrCode, Brain, Hand, Sparkles, Mic, ImageIc
 import { BrandMark, BRAND } from "@/components/Brand";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TelegramDemo } from "@/components/TelegramDemo";
+import { Pricing, VideoSection } from "@/components/LandingPricing";
 
 const FEATURES = [
   { Icon: Send, color: "#229ED9", t: "Telegram bot", d: "Paste your BotFather token, click connect. Every message gets an instant reply.", span: "lg:col-span-2" },
@@ -29,11 +30,13 @@ const Nav = () => (
       <div className="hidden md:flex gap-8 text-sm text-muted-foreground">
         <a href="#features" className="hover:text-foreground transition-colors" data-testid="nav-features-link">Features</a>
         <a href="#how" className="hover:text-foreground transition-colors" data-testid="nav-how-link">How it works</a>
+        <a href="#video" className="hover:text-foreground transition-colors" data-testid="nav-video-link">Video</a>
+        <a href="#pricing" className="hover:text-foreground transition-colors" data-testid="nav-pricing-link">Pricing</a>
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />
         <Link to="/login" data-testid="nav-login-btn" className="px-3 sm:px-4 py-2 text-sm font-semibold text-foreground/80 hover:text-foreground transition-colors">Log in</Link>
-        <Link to="/signup" data-testid="nav-signup-btn" className="rounded-full btn-brand px-4 sm:px-5 py-2 text-sm font-semibold">Start free</Link>
+        <Link to="/signup" data-testid="nav-signup-btn" className="rounded-full btn-brand px-4 sm:px-5 py-2 text-sm font-semibold">Free trial</Link>
       </div>
     </div>
   </nav>
@@ -56,10 +59,11 @@ const Hero = () => (
         </p>
         <div className="mt-10 flex flex-wrap gap-3 sm:gap-4">
           <Link to="/signup" data-testid="hero-get-started-btn" className="inline-flex items-center gap-2 rounded-full btn-brand px-7 py-3.5 font-semibold">
-            Create free account <ArrowRight className="h-4 w-4" />
+            Start 14-day free trial <ArrowRight className="h-4 w-4" />
           </Link>
-          <a href="#how" data-testid="hero-how-btn" className="rounded-full border border-border bg-card/60 px-7 py-3.5 font-semibold hover:bg-muted transition-colors">How it works</a>
+          <a href="#video" data-testid="hero-how-btn" className="rounded-full border border-border bg-card/60 px-7 py-3.5 font-semibold hover:bg-muted transition-colors">Watch the video</a>
         </div>
+        <p className="mt-4 text-xs text-muted-foreground" data-testid="hero-trial-note">14 days free · 200 AI replies · no payment needed</p>
         <div className="mt-12 grid grid-cols-3 gap-3 max-w-md">
           {[["< 5s", "avg. reply"], ["24/7", "always on"], ["2", "channels"]].map(([a, b]) => (
             <div key={b} className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3 card-shadow" data-testid={`hero-stat-${b.split(" ").pop()}`}>
@@ -122,7 +126,7 @@ const Cta = () => (
           <p className="mt-3 text-white/80 max-w-lg">Your AI seller answers Telegram and Messenger in Khmer, sends product photos and collects KHQR payments.</p>
         </div>
         <Link to="/signup" data-testid="cta-signup-btn" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-7 py-3.5 font-semibold text-indigo-700 shadow-lg transition-transform hover:-translate-y-0.5">
-          Start free <ArrowRight className="h-4 w-4" />
+          Start free trial <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
     </div>
@@ -136,6 +140,8 @@ export default function Landing() {
       <Hero />
       <Features />
       <How />
+      <VideoSection />
+      <Pricing />
       <Cta />
       <footer className="border-t border-border/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

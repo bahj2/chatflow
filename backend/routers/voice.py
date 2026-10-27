@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import billing as B
 import media as M
-from core import db, logger, get_settings, current_user, owner_only, require_pro
+from core import db, logger, get_settings, current_user, owner_only, require_voice
 
 router = APIRouter(prefix="/api")
 
@@ -16,7 +16,7 @@ class VoiceTestIn(BaseModel):
 
 @router.post("/settings/seller-voice")
 async def seller_voice(file: UploadFile = File(...), text: str = Form("", max_length=500), user=Depends(owner_only)):
-    await require_pro(user["business_id"])
+    await require_voice(user["business_id"])
     data = await file.read()
     if not data or len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Voice sample must be under 10 MB")
@@ -47,7 +47,7 @@ async def delete_seller_voice(user=Depends(owner_only)):
 
 @router.post("/voice/test")
 async def voice_test(body: VoiceTestIn, user=Depends(current_user)):
-    await require_pro(user["business_id"])
+    await require_voice(user["business_id"])
     s = B.effective(await get_settings(user["business_id"]), await B.sub_status(db, user["business_id"]))
     if body.voice:
         s = s.model_copy(update={"voice": body.voice})
