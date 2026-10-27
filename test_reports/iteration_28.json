@@ -1,0 +1,23 @@
+{
+  "summary": "Tested the backend and frontend for the Facebook lock, billing relay mode and the dashboard design pass. Backend: 7 of 7 pytest tests passed. (1) GET /api/meta/status returns locked=false for the superadmin and locked=true for a new shop owner. (2) POST /api/meta/facebook/start and /quick return 403 'Facebook Messenger is coming soon.' for shop owners. (3) GET /api/auth/facebook/available returns available=false, and POST /api/auth/facebook/start returns 503. (4) POST /api/billing/checkout {item:'pro'} returns mode 'relay', currency KHR and price_usd 25, using 1 KHQR.dev call. Frontend (1 more checkout, from the UI): (a) Shop owner Channels page shows the Telegram card and messenger-coming-soon with the 'Coming soon' badge. There is no Connect with Facebook button and no Platform Facebook app card. (b) Superadmin Channels page shows the normal FacebookConnect UI (fb-connect) and the Meta setup card. (c) The PageHeader renders on Products, Orders, AI Settings, Channels, Billing and Businesses. (d) The old testids still work: add-product-btn, products-count, save-settings-btn, nav-*, logout-btn. orders-paid-count only appears when there are paid orders. (e) The sidebar group labels Workspace/Setup/Admin show; Admin is shown only for the superadmin. (f) sidebar-plan-chip shows 'Free trial | 14 days left · 0/200 replies' and links to /dashboard/billing (superadmin sees 'Platform | Unlimited AI replies'). (g) Choosing Pro opens billing-pay-dialog with 'Complete your payment', the amount '102,500៛ ($25.00)', a QR image that loads (naturalWidth 600), a countdown showing 'Waiting for payment' with 9:58 left, the 3 steps and a deeplink button. (h) Invoice history shows the status pill as 'Pending' (capitalized). (i) At 390px there is no horizontal overflow (scrollWidth 390) on Inbox, Products, Orders, Settings, Channels, Billing or the pay dialog. All test data was cleaned up, and the founder's khqr_token was left untouched.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Billing pay dialog at 390x844", "issues": ["The dialog is taller than the screen and sits right at the top edge. The close (X) button at top-right is partly cut off (y≈0). Add top padding or margin, or make the dialog scroll with the close button pinned."]},
+      {"screen": "Dashboard on mobile/tablet (<lg)", "issues": ["sidebar-plan-chip is hidden below lg (hidden lg:block), so mobile users can't see their plan or days left except on the Billing page. Optional."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter28_fb_lock_billing.py", "/app/test_reports/pytest/iter28.xml"],
+  "action_items": ["Optional: fix the pay dialog on mobile so the close button is fully visible (add top spacing or a max-height with scrolling)."],
+  "critical_code_review_comments": [
+    "locked_for(None) in /auth/facebook/available and /auth/facebook/start always counts as locked while META_PUBLIC!=true. This is intended (Facebook sign-in is hidden for everyone), but it means the superadmin can't use Facebook login either. That is fine as long as it is intentional."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter28_fb_lock_billing.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Created 2 test_iter28* shop owners (via the API). Both were deleted along with their businesses, subscriptions, invoices and per-business settings.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "In total, 2 KHQR.dev checkout calls were made this iteration. Pay dialog testids: billing-pay-dialog/amount/qr/countdown/steps/deeplink. Pro plan in KHR is 102,500៛. plan-choose-{key} buttons start checkout. META_PUBLIC=false in backend/.env controls the Facebook lock."
+}

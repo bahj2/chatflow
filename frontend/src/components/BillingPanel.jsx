@@ -109,7 +109,7 @@ const PayDialog = ({ inv, onClose, onPaid }) => {
   const auto = cur.mode === "relay";
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm p-0 overflow-hidden gap-0" data-testid="billing-pay-dialog">
+      <DialogContent className="max-w-sm p-0 gap-0 max-h-[92dvh] overflow-y-auto" data-testid="billing-pay-dialog">
         <DialogHeader className="px-6 pt-6 pb-4 text-left">
           <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">Invoice {cur.number}</p>
           <DialogTitle className="font-display text-xl tracking-tight">Complete your payment</DialogTitle>

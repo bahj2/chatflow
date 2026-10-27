@@ -250,3 +250,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - _relay_call: per-token 1.1 s spacing; shared per-IP budget (_MAX 7/60 s, 3 kept for customer QRs; background payment check + deeplink only use spare budget); rate limit → follow "Retry in Ns" if it fits else friendly BUSY; IP-limit fills window with entries expiring after the pause (sorted deque); "Failed to validate store payment link" retried up to 2 times
 - /api/payments/preview no longer calls token_ok first (saves a call)
 - Tests: iteration_24/25/26 + tests/test_iter24*, test_iter25_khqr_followups.py (live), test_iter26_khqr_budget_unit.py (19 unit) pass
+
+## Iteration 32 (2026-10) — KHQR.dev billing, Facebook "Coming soon", professional dashboard
+- Founder billing now uses the KHQR.dev rbk_ token (founder settings khqr_token), so plans turn on automatically. KHQR.dev QR pays KHQR.dev's ABA PayWay merchant ("DevPro by S.HOU"), which pays out to the founder. It does NOT pay tit_sambath@bkrt directly. The old BAKONG_TOKEN (JWT) expired on 6 Jun 2026.
+- Facebook locked for shops: META_PUBLIC=false in backend/.env. locked_for() in routers/meta.py blocks start/quick (403) and Facebook sign-in; Channels shows a "Coming soon" card. Superadmin is unaffected. Set META_PUBLIC=true after Meta App Review.
+- Design pass: shared PageHeader (components/PageHeader.jsx), grouped sidebar + plan chip, refined Section, tables, plan cards, redesigned KHQR pay dialog.
+- Tested in iteration_28 (100% backend and frontend).
+- Backlog: show the plan chip on mobile; on the deployed app, paste the rbk_ token into the admin AI Settings → Payments (the production DB is separate).
