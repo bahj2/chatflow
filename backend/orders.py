@@ -19,7 +19,8 @@ PAID_MSG = {"en": "Payment received ✅ Thank you! Order {number} · {amount} is
 
 
 def khqr_caption(o: dict) -> str:
-    return f"Bakong KHQR · {P.fmt_amount(o['total'], o['currency'])} · Order {o['number']}\nScan with any bank app (ABA, ACLEDA, Wing, Bakong…) · valid {P.QR_MINUTES} min"
+    alt = f" ({P.fmt_amount(o['price_total'], o['price_currency'])})" if o.get("price_currency") else ""
+    return f"Bakong KHQR · {P.fmt_amount(o['total'], o['currency'])}{alt} · Order {o['number']}\nScan with any bank app (ABA, ACLEDA, Wing, Bakong…) · valid {P.QR_MINUTES} min"
 
 
 def khqr_att(o: dict) -> dict:
@@ -60,6 +61,9 @@ async def create_order(conv: dict, s: Settings, items: list) -> Optional[dict]:
     except Exception as e:
         logger.warning("KHQR creation failed: %s", e)
         return None
+    price_total = price_currency = None
+    if q["currency"] != currency:  # store takes only the other currency: the QR (and the order) use that
+        price_total, price_currency, total, currency = total, currency, q["amount"], q["currency"]
     media = await M.save_media(db, conv["business_id"], q["png"], "image/png", "khqr")
     stale = [o["id"] async for o in db.orders.find({"business_id": conv["business_id"], "conversation_id": conv["id"], "status": "pending"}, {"_id": 0, "id": 1})]
     if stale:
@@ -68,6 +72,7 @@ async def create_order(conv: dict, s: Settings, items: list) -> Optional[dict]:
     now = datetime.now(timezone.utc)
     order = {"id": str(uuid.uuid4()), "business_id": conv["business_id"], "conversation_id": conv["id"], "channel": conv["channel"],
              "customer": conv.get("name", ""), "number": number, "items": lines, "total": total, "currency": currency, "mode": q["mode"],
+             "price_total": price_total, "price_currency": price_currency,
              "qr": q["qr"], "md5": q["md5"], "deeplink": q["deeplink"], "qr_media_id": media["id"], "status": "pending",
              "created_at": now.isoformat(), "expires_at": (now + timedelta(minutes=P.QR_MINUTES)).isoformat(), "paid_at": None, "paid_by": ""}
     await db.orders.insert_one(dict(order))

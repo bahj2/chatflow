@@ -1,6 +1,8 @@
 """Bakong KHQR payments: local QR (manual confirm) or KHQR.dev relay (automatic payment check)."""
 import asyncio
 import io
+import os
+import threading
 import re
 import time
 
@@ -8,6 +10,7 @@ from bakong_khqr import KHQR
 from PIL import Image
 
 QR_MINUTES = 10
+USD_KHR = float(os.environ.get("USD_KHR_RATE") or 4100)  # riel per dollar when a KHQR.dev store takes only one currency
 RELAY_PREFIX = "rbk"
 JWT_PREFIX = "eyJ"  # Bakong Open API token (api-bakong.nbc.gov.kh), valid 90 days
 ACCOUNT_RE = re.compile(r"^[A-Za-z0-9._-]{2,40}@[A-Za-z0-9._-]{2,20}$")
@@ -96,12 +99,60 @@ def _local_qr(account_id: str, merchant: str, city: str, amount: float, currency
     return qr, k.generate_md5(qr)
 
 
+# KHQR.dev allows 1 request per second per token: space every call for the same token, retry once if still limited
+_GAP = 1.1
+_locks: dict = {}
+_last: dict = {}
+_guard = threading.Lock()
+
+
+def _relay_call(token: str, fn):
+    with _guard:
+        lock = _locks.setdefault(token, threading.Lock())
+    with lock:
+        for attempt in range(2):
+            wait = _last.get(token, 0) + _GAP - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                return fn(KHQR(token))
+            except ValueError as e:
+                if attempt == 0 and "rate limit" in str(e).lower():
+                    m = re.search(r"retry in (\d+)", str(e), re.I)
+                    time.sleep(min(5, int(m.group(1)) if m else 2))
+                    continue
+                raise
+            finally:
+                _last[token] = time.time()
+
+
 def _relay_qr(token: str, amount: float, currency: str, bill: str) -> tuple:
     try:
-        res = KHQR(token).create_qr(amount=amount, currency=currency, bill_number=bill)
+        res = _relay_call(token, lambda k: k.create_qr(amount=amount, currency=currency, bill_number=bill))
     except ValueError as e:
         raise PaymentError(str(e))
     return str(res), res.md5
+
+
+def convert(amount: float, currency: str, to: str) -> tuple:
+    if to == currency:
+        return amount, currency
+    if to == "KHR":
+        return float(max(100, round(amount * USD_KHR / 100) * 100)), "KHR"  # whole hundreds of riel
+    return round(amount / USD_KHR, 2), "USD"
+
+
+def _relay_any(token: str, amount: float, currency: str, bill: str) -> tuple:
+    """A KHQR.dev store may accept only KHR (or only USD): then charge the same price in the store's currency."""
+    try:
+        return (*_relay_qr(token, amount, currency, bill), amount, currency)
+    except PaymentError as e:
+        msg = str(e)
+        other = "KHR" if "KHR store" in msg else "USD" if "USD store" in msg else None
+        if not other or other == currency:
+            raise
+        amount, currency = convert(amount, currency, other)
+        return (*_relay_qr(token, amount, currency, bill), amount, currency)
 
 
 def _png(qr: str) -> bytes:
@@ -114,7 +165,7 @@ def _png(qr: str) -> bytes:
 
 def _deeplink(token: str, qr: str, app_name: str):
     try:
-        return KHQR(token).generate_deeplink(qr, appName=app_name[:30] or "ReplyFlow")
+        return _relay_call(token, lambda k: k.generate_deeplink(qr, appName=app_name[:30] or "ReplyFlow"))
     except Exception:
         return None
 
@@ -152,7 +203,7 @@ def _bulk_paid(token: str, md5s: list) -> list:
                 paid.append(m)
         return paid
     try:
-        return KHQR(token).check_bulk_payments(md5s[:50])
+        return _relay_call(token, lambda k: k.check_bulk_payments(md5s[:50]))
     except ValueError as e:
         raise PaymentError(str(e))
 
@@ -162,17 +213,18 @@ def _token_ok(token: str) -> tuple:
         if token.startswith(JWT_PREFIX):
             _bakong("check_transaction_by_md5", token, {"md5": "0" * 32})  # "not found" = token works
         else:
-            KHQR(token).check_payment("0" * 32)
+            _relay_call(token, lambda k: k.check_payment("0" * 32))
         return True, ""
     except (ValueError, PaymentError) as e:
         return False, str(e)
 
 
 async def make_qr(s, amount: float, currency: str, bill: str) -> dict:
-    """Returns {qr, md5, mode, png, deeplink}. Uses the relay when the business added a KHQR.dev token."""
+    """Returns {qr, md5, mode, png, deeplink, amount, currency} (amount/currency actually in the QR).
+    Uses the relay when the business added a KHQR.dev token."""
     token = (s.khqr_token or "").strip()
     if token.startswith(RELAY_PREFIX):
-        qr, md5 = await asyncio.to_thread(_relay_qr, token, amount, currency, bill)
+        qr, md5, amount, currency = await asyncio.to_thread(_relay_any, token, amount, currency, bill)
         mode, link = "relay", await asyncio.to_thread(_deeplink, token, qr, s.business_name)
     else:
         if not ACCOUNT_RE.match(s.bakong_account_id or ""):
@@ -181,7 +233,8 @@ async def make_qr(s, amount: float, currency: str, bill: str) -> dict:
                                           s.bakong_city or "Phnom Penh", amount, currency, bill)
         # "relay" = checked automatically; a valid Bakong Open API token checks this locally made QR directly with Bakong
         mode, link = ("relay" if jwt_valid(token) else "local"), None
-    return {"qr": qr, "md5": md5, "mode": mode, "png": await asyncio.to_thread(_png, qr), "deeplink": link}
+    return {"qr": qr, "md5": md5, "mode": mode, "png": await asyncio.to_thread(_png, qr), "deeplink": link,
+            "amount": amount, "currency": currency}
 
 
 async def qr_png(qr: str) -> bytes:
