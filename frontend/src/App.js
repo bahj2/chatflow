@@ -11,6 +11,7 @@ import Dashboard from "@/pages/Dashboard";
 import AuthCallback from "@/pages/AuthCallback";
 import Legal from "@/pages/Legal";
 import FacebookAuth from "@/pages/FacebookAuth";
+import FacebookDone from "@/pages/FacebookDone";
 
 const Protected = ({ children }) => {
   const { user } = useAuth();
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/demo" element={<Demo />} />
       <Route path="/auth/facebook" element={<FacebookAuth />} />
+      <Route path="/fb-done" element={<FacebookDone />} />
       <Route path="/privacy" element={<Legal />} />
       <Route path="/terms" element={<Legal />} />
       <Route path="/data-deletion" element={<Legal />} />

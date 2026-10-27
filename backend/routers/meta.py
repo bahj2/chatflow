@@ -74,13 +74,16 @@ async def meta_status(user=Depends(current_user)):
     s = await get_settings(user["business_id"])
     ch = await db.fb_choices.find_one({"business_id": user["business_id"]}, {"_id": 0, "exp": 1})
     pending = bool(ch and ch["exp"].replace(tzinfo=timezone.utc) > now())  # came back from Facebook, Page not picked yet
+    u = await db.users.find_one({"id": user.get("id")}, {"_id": 0, "fb_token_exp": 1}) or {}
+    remembered = bool(u.get("fb_token_exp") and u["fb_token_exp"].replace(tzinfo=timezone.utc) > now())
     return {"available": available(), "connected": bool(s.fb_oauth and s.fb_page_id), "page_id": s.fb_page_id if s.fb_oauth else "",
-            "page_name": s.fb_page_name if s.fb_oauth else "", "pending": pending}
+            "page_name": s.fb_page_name if s.fb_oauth else "", "pending": pending, "remembered": remembered}
 
 
 class StartIn(BaseModel):
     base_url: str    # this backend's public address (callback is registered in the Meta app)
     return_url: str  # the dashboard address to come back to
+    popup: bool = False  # Facebook opened in a small window over our site: come back to /fb-done, which closes it
 
 
 @router.post("/meta/facebook/start")
@@ -91,8 +94,10 @@ async def facebook_start(body: StartIn, user=Depends(owner_only)):
     redirect_uri = clean_base(body.base_url) + CALLBACK_PATH
     state = secrets.token_urlsafe(32)
     await db.oauth_states.insert_one({"state": state, "business_id": user["business_id"], "user_id": user.get("id"), "redirect_uri": redirect_uri,
-                                      "return_url": clean_base(body.return_url), "exp": now() + timedelta(minutes=10)})
+                                      "return_url": clean_base(body.return_url), "popup": body.popup, "exp": now() + timedelta(minutes=10)})
     q = {"client_id": c["APP_ID"], "redirect_uri": redirect_uri, "state": state, "response_type": "code"}
+    if body.popup:
+        q["display"] = "popup"
     if c["LOGIN_CONFIG_ID"]:
         q["config_id"] = c["LOGIN_CONFIG_ID"]  # Facebook Login for Business configuration (permissions chosen in Meta)
     else:
@@ -131,7 +136,7 @@ async def facebook_callback(code: str = "", state: str = "", error: str = "", er
         raise HTTPException(400, "This Facebook sign-in link has expired. Go back to Channels and press Connect with Facebook again.")
     if row.get("purpose") == "login":
         return await finish_facebook_login(row, code, error_description or error)
-    back = f"{row['return_url']}/dashboard/channels"
+    back = f"{row['return_url']}/fb-done" if row.get("popup") else f"{row['return_url']}/dashboard/channels"
     if error or not code:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': error_description or 'Facebook sign-in was cancelled.'})}")
     c = cfg()

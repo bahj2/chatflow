@@ -31,6 +31,7 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
   const [err, setErr] = useState("");
   const [showManual, setShowManual] = useState(false);
   const once = useRef(false);
+  const reported = useRef(false); // the Facebook window already reported back (don't finish twice)
 
   const load = () => api.get("/meta/status").then((r) => { setMeta(r.data); return r.data; }).catch(() => { setMeta({ available: false, connected: false }); return null; });
 
@@ -45,6 +46,27 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
     } catch (e) { setErr(errMsg(e)); } finally { setBusy(""); }
   };
 
+  // After Facebook: one Page -> connect at once; several -> let them pick here
+  const finishPick = () => api.get("/meta/facebook/pages").then((r) => {
+    const free = r.data.filter((p) => !p.taken);
+    if (r.data.length === 1 && free.length === 1) connectPage(free[0].id);
+    else { setPages(r.data); setPick(free[0]?.id || ""); }
+  }).catch((x) => setErr(errMsg(x)));
+
+  // The small Facebook window reports back here, then closes itself
+  useEffect(() => {
+    const onMsg = (ev) => {
+      if (ev.origin !== window.location.origin || ev.data?.source !== "replyflow-fb") return;
+      reported.current = true;
+      setBusy("");
+      if (ev.data.fb_error) setErr(ev.data.fb_error);
+      else finishPick();
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (once.current) return;
     once.current = true;
@@ -55,21 +77,29 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
     // Back from Facebook (even if the ?fb=pick marker got lost on the way): finish connecting the Page
     load().then((m) => {
       if (!m || m.connected || !(m.pending || q.get("fb") === "pick")) return;
-      api.get("/meta/facebook/pages").then((r) => {
-        const free = r.data.filter((p) => !p.taken);
-        if (r.data.length === 1 && free.length === 1) connectPage(free[0].id); // only one Page: no need to ask
-        else { setPages(r.data); setPick(free[0]?.id || ""); }
-      }).catch((x) => setErr(errMsg(x)));
+      finishPick();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const start = async () => {
-    setBusy("start"); setErr("");
+    setErr("");
+    const w = 600, h = 720;
+    const win = window.open("/fb-done?loading=1", "replyflow-fb",
+      `width=${w},height=${h},left=${Math.max(0, window.screenX + (window.outerWidth - w) / 2)},top=${Math.max(0, window.screenY + (window.outerHeight - h) / 2)}`);
+    setBusy("start");
+    reported.current = false;
     try {
-      const { data } = await api.post("/meta/facebook/start", { base_url: BACKEND_URL, return_url: window.location.origin });
-      window.location.href = data.url;
-    } catch (e) { setErr(errMsg(e)); setBusy(""); }
+      const { data } = await api.post("/meta/facebook/start", { base_url: BACKEND_URL, return_url: window.location.origin, popup: !!win });
+      if (!win || win.closed) { window.location.href = data.url; return; } // popup blocked: use this tab
+      win.location.href = data.url;
+      const timer = setInterval(() => { // closed without finishing: re-check, maybe the message got lost
+        if (!win.closed) return;
+        clearInterval(timer);
+        setBusy((b) => (b === "start" ? "" : b));
+        if (!reported.current) load().then((m) => { if (m && !m.connected && m.pending) finishPick(); });
+      }, 700);
+    } catch (e) { win?.close(); setErr(errMsg(e)); setBusy(""); }
   };
   // Connect: instant when this person already approved Facebook before; otherwise go to Facebook once
   const quick = async () => {
@@ -144,8 +174,8 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
         </div>
       ) : meta.available ? (
         <div className="space-y-2">
-          <FbButton onClick={quick} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : "Connect with Facebook"} testid="fb-connect-btn" />
-          <p className="text-xs text-muted-foreground">Log in to Facebook, tick your Page, press Continue — that’s it. You need to be an admin of the Page.</p>
+          <FbButton onClick={meta.remembered ? quick : start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : busy === "start" ? "Pick your Page in the Facebook window…" : "Connect with Facebook"} testid="fb-connect-btn" />
+          <p className="text-xs text-muted-foreground">A small Facebook window opens — tick your Page and press Continue. You stay on this page. You need to be an admin of the Page.</p>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="fb-not-available">One-click “Connect with Facebook” is coming soon.{canManual ? " You can connect manually below." : " Please contact Replyflow AI support to connect your Page."}</p>

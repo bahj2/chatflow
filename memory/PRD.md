@@ -215,3 +215,9 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - POST /api/meta/facebook/quick (owner): remembered approval + 1 free Page → connects instantly (no Facebook screens); several Pages → in-app picker; none/expired/revoked → Facebook login URL (stale key cleared)
 - Channels Connect button uses quick; picker has "Page not in the list? Choose it on Facebook"; Change page still opens Facebook
 - tests/check_facebook_quick.py (Graph STUBBED) pass; connect + login tests still pass; Vaa's real connection untouched
+
+## Iteration 27 (2026-10) — Connect in a small Facebook window
+- Channels Connect / Change page open Facebook in a centered popup (display=popup) over our site; state.popup → callback returns to /fb-done (FacebookDone.jsx) which postMessages {source:"replyflow-fb", fb|fb_error} to the opener (same origin only) and closes; Channels then auto-connects one Page or shows the in-app picker
+- Popup blocked → same-tab redirect fallback; popup opened as a tab without opener → /fb-done continues to /dashboard/channels; closed early → status re-check (guarded against double finish)
+- /api/meta/status returns remembered → button uses instant quick connect when the person's Facebook approval is remembered, otherwise the popup
+- Browser-verified: popup opens real Facebook, main page stays on Channels, /fb-done closes itself and the picker appears (desktop + 390 px, no overflow)
