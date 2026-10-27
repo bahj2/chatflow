@@ -160,6 +160,8 @@ def _relay_call(token: str, fn, wait_max: float = 25, keep: int = 0):
                 if attempt < 2 and "validate store payment link" in msg and left > 3:
                     time.sleep(2.5)  # KHQR.dev's store-link check fails now and then; a second try usually works
                     continue
+                if "rate limit" in msg:
+                    raise ValueError(BUSY)  # limit hit on a later try: friendly message, never a raw KHQR.dev error
                 raise
             finally:
                 _last[token] = time.time()

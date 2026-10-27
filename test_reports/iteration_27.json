@@ -1,0 +1,21 @@
+{
+  "summary": "Final backend retest of the changes made after iter26. All 28 tests passed: 19 of 19 in the iter26 unit suite, plus 9 of 9 new iter27 tests (5 stub tests and 4 live API tests, only 1 real KHQR.dev preview call). (1) The IP rate limit retry now works. With 3 existing recent entries and 'IP Rate limit exceeded. Retry in 3s', the call succeeds after about 3 s on the second try. The window stays sorted and never goes above 7 entries. During the pause, another token's _bulk_paid returns []. A 'Retry in 40s' with wait_max 25 raises BUSY right away. (2) 'Failed to validate store payment link.' is tried 3 times, 2.5 s apart: the 3rd try succeeds after about 5 s, 3 failures raise the original error, and with wait_max=2 there is no retry. (3) Admin revenue: a test shop with a paid KHR invoice (41000, price_usd 10), a paid USD invoice (25) and a pending one (99) shows revenue 35 in GET /api/admin/businesses. (4) POST /api/payments/preview: a shop with only a Bakong account ID gets 200 with mode 'local' and deeplink null. A test shop with a copy of the real KHR-only rbk token gets 200 with mode 'relay' in 5.0 s, with a deeplink. (5) The server starts cleanly and GET /api/public/plans returns 200. The SyntaxError in backend.err.log is an old entry. All test data was cleaned up (verified 0 users, invoices and businesses left).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "payments._relay_call", "issue": "Edge case: the rate-limit retry only happens on attempt 0. If the store-link check fails on the first try and the next try hits a rate limit, the raw rate-limit error is raised instead of being retried or turned into the friendly BUSY message. This is rare."},
+      {"endpoint": "payments._relay_call (IP limit)", "issue": "If the local window already holds 7 real entries when KHQR.dev reports the IP limit, no filler is added. The retry then waits for real entries to expire and may return BUSY. This is acceptable, and the message is friendly."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_iter27_khqr_final.py", "/app/backend/tests/test_iter26_khqr_budget_unit.py", "/app/test_reports/pytest/iter27_final.xml", "/app/test_reports/pytest/iter27_unit.xml"],
+  "action_items": ["None required. Optional: turn a rate-limit error on a later retry attempt into the BUSY message."],
+  "critical_code_review_comments": ["The IP-limit filler entries are timestamped now - 60 + pause and merged in sorted order, so _calls[0] stays the oldest and _budget computes the wait correctly.", "The preview no longer calls token_ok, which saves a KHQR.dev call. Errors from make_qr are still shown as 400 'Could not create the QR: ...'."],
+  "updated_files": ["/app/backend/tests/test_iter27_khqr_final.py"],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend only)"},
+  "test_credentials": "admin@replyflow.com / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "A temporary TEST_i27shop with 3 TEST_ invoices, all removed after the run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run the iter27 file with -n 0 (pytest.ini enables xdist and the module fixture must not run in parallel). test_preview_relay_live makes about 2 real KHQR.dev calls (create_qr + deeplink) and skips if KHQR.dev answers busy."
+}
