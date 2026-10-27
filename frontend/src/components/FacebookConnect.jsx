@@ -71,6 +71,20 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
       window.location.href = data.url;
     } catch (e) { setErr(errMsg(e)); setBusy(""); }
   };
+  // Connect: instant when this person already approved Facebook before; otherwise go to Facebook once
+  const quick = async () => {
+    setBusy("page"); setErr("");
+    try {
+      const { data } = await api.post("/meta/facebook/quick", { base_url: BACKEND_URL, return_url: window.location.origin });
+      if (data.url) { window.location.href = data.url; return; }
+      if (data.connected) {
+        toast.success(`Messenger connected to ${data.page_name || "your Page"}`);
+        await load(); onChanged?.(); setBusy(""); return;
+      }
+      const r = await api.get("/meta/facebook/pages");
+      setPages(r.data); setPick(r.data.find((p) => !p.taken)?.id || ""); setBusy("");
+    } catch (e) { setErr(errMsg(e)); setBusy(""); }
+  };
   const disconnect = async () => {
     if (!window.confirm(`Disconnect ${meta.page_name || "this Page"}? Messenger chats will stop reaching your Inbox.`)) return;
     setBusy("off");
@@ -126,10 +140,11 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
             <FbButton onClick={() => connectPage(pick)} busy={busy === "page"} disabled={!pick} label="Connect this Page" testid="fb-connect-page-btn" />
             <button onClick={() => setPages(null)} className="rounded-full px-4 text-sm text-muted-foreground hover:text-foreground" data-testid="fb-pick-cancel">Cancel</button>
           </div>
+          <button onClick={start} disabled={!!busy} className="text-xs text-primary hover:underline underline-offset-4" data-testid="fb-page-not-listed">Page not in the list? Choose it on Facebook</button>
         </div>
       ) : meta.available ? (
         <div className="space-y-2">
-          <FbButton onClick={start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : "Connect with Facebook"} testid="fb-connect-btn" />
+          <FbButton onClick={quick} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : "Connect with Facebook"} testid="fb-connect-btn" />
           <p className="text-xs text-muted-foreground">Log in to Facebook, tick your Page, press Continue — that’s it. You need to be an admin of the Page.</p>
         </div>
       ) : (

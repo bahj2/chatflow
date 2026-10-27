@@ -24,6 +24,8 @@ async def fake_graph(method, path, **p):
         return {"id": path, "name": "Dara Shop" if path == "PAGE1" else "Dara Shop 2", "access_token": f"PT_{path}"}
     if path.endswith("/subscribed_apps"):
         return {"success": True}
+    if path.endswith("/subscriptions"):
+        return {"data": []}
     raise AssertionError(path)
 
 

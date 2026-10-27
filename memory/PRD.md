@@ -209,3 +209,9 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Shared Pages saved as pending fb_choices → user lands on /dashboard/channels which auto-connects a single Page
 - Session handoff: one-time login code (db.login_codes, 2-min TTL) → /auth/facebook page → POST /api/auth/facebook/finish → normal JWT (token never in URL)
 - Verified: tests/check_facebook_login.py (Graph STUBBED) 8 scenarios pass; real button reaches Facebook login with the real app. Not yet tried by a real person end to end
+
+## Iteration 26 (2026-10) — Instant "Connect with Facebook"
+- The person's 60-day Facebook approval (user token) is kept sealed on users (fb_user_token_enc, fb_token_exp 55 d) after Facebook sign-in or any Connect
+- POST /api/meta/facebook/quick (owner): remembered approval + 1 free Page → connects instantly (no Facebook screens); several Pages → in-app picker; none/expired/revoked → Facebook login URL (stale key cleared)
+- Channels Connect button uses quick; picker has "Page not in the list? Choose it on Facebook"; Change page still opens Facebook
+- tests/check_facebook_quick.py (Graph STUBBED) pass; connect + login tests still pass; Vaa's real connection untouched

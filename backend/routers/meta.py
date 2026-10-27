@@ -90,7 +90,7 @@ async def facebook_start(body: StartIn, user=Depends(owner_only)):
     c = cfg()
     redirect_uri = clean_base(body.base_url) + CALLBACK_PATH
     state = secrets.token_urlsafe(32)
-    await db.oauth_states.insert_one({"state": state, "business_id": user["business_id"], "redirect_uri": redirect_uri,
+    await db.oauth_states.insert_one({"state": state, "business_id": user["business_id"], "user_id": user.get("id"), "redirect_uri": redirect_uri,
                                       "return_url": clean_base(body.return_url), "exp": now() + timedelta(minutes=10)})
     q = {"client_id": c["APP_ID"], "redirect_uri": redirect_uri, "state": state, "response_type": "code"}
     if c["LOGIN_CONFIG_ID"]:
@@ -98,6 +98,30 @@ async def facebook_start(body: StartIn, user=Depends(owner_only)):
     else:
         q["scope"] = SCOPES
     return {"url": f"https://www.facebook.com/{GRAPH_VERSION}/dialog/oauth?{urlencode(q)}"}
+
+
+@router.post("/meta/facebook/quick")
+async def facebook_quick(body: StartIn, user=Depends(owner_only)):
+    """Connect button: if this person already approved Facebook (sign-in or earlier connect), connect at once with no
+    Facebook screens. Otherwise return the Facebook login address."""
+    bid = user["business_id"]
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "fb_user_token_enc": 1, "fb_token_exp": 1})
+    tok = None
+    if u and u.get("fb_user_token_enc") and u.get("fb_token_exp") and u["fb_token_exp"].replace(tzinfo=timezone.utc) > now():
+        tok = N.unseal(u["fb_user_token_enc"])
+    if tok and available():
+        try:
+            pages = await shared_pages(tok)
+        except GraphError:  # approval removed or expired on Facebook's side
+            pages = None
+            await db.users.update_one({"id": user["id"]}, {"$unset": {"fb_user_token_enc": "", "fb_token_exp": ""}})
+        if pages:
+            await save_choice(bid, tok, pages)
+            free = [p for p in pages if not await taken_by_other(bid, {"fb_page_id": str(p["id"])})]
+            if len(pages) == 1 and free:
+                return {"connected": True, **await facebook_connect_page(str(free[0]["id"]), user)}
+            return {"pick": True}
+    return {"url": (await facebook_start(body, user))["url"]}
 
 
 @router.get("/meta/facebook/callback")
@@ -116,6 +140,8 @@ async def facebook_callback(code: str = "", state: str = "", error: str = "", er
         pages = await shared_pages(user_token)
     except GraphError as e:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': str(e)})}")
+    if row.get("user_id"):
+        await remember_token(row["user_id"], user_token)
     if not pages:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': 'No Facebook Page was shared. Press Connect again and tick your Page, or make sure you are an admin of the Page.'})}")
     await save_choice(row["business_id"], user_token, pages)
@@ -132,6 +158,11 @@ async def user_token_from_code(c: dict, redirect_uri: str, code: str) -> str:
 async def shared_pages(user_token: str) -> list:
     # /me/accounts already returns each Page's own token (only pages_show_list needed, no extra permission)
     return (await graph("GET", "me/accounts", fields="id,name,access_token", limit=100, access_token=user_token)).get("data", [])
+
+
+async def remember_token(user_id: str, user_token: str):
+    """Keeps the person's (60-day) Facebook approval, sealed, so the next Connect needs no Facebook screens."""
+    await db.users.update_one({"id": user_id}, {"$set": {"fb_user_token_enc": N.seal(user_token), "fb_token_exp": now() + timedelta(days=55)}})
 
 
 async def save_choice(bid: str, user_token: str, pages: list):
@@ -199,6 +230,7 @@ async def finish_facebook_login(row: dict, code: str, error: str):
     except HTTPException as e:
         return fail(e.detail)
     bid = user["business_id"]
+    await remember_token(user["id"], user_token)
     if created and user.get("role") == "owner" and pages:  # new shop: name it after the Page
         shop = (pages[0].get("name") or "").strip()[:80]
         if shop:
