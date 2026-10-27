@@ -120,6 +120,10 @@ async def make_qr(s, amount: float, currency: str, bill: str) -> dict:
     return {"qr": qr, "md5": md5, "mode": mode, "png": await asyncio.to_thread(_png, qr), "deeplink": link}
 
 
+async def qr_png(qr: str) -> bytes:
+    return await asyncio.to_thread(_png, qr)
+
+
 async def bulk_paid(token: str, md5s: list) -> list:
     return await asyncio.to_thread(_bulk_paid, token, md5s)
 

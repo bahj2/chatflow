@@ -10,6 +10,8 @@ import { VoiceSection } from "@/components/VoiceSettings";
 import { NotionSection } from "@/components/NotionSection";
 import { PaymentsSection } from "@/components/PaymentsSection";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProNote } from "@/components/ProLock";
+import { useBilling } from "@/lib/billing";
 
 export const Section = ({ title, desc, children }) => (
   <section className="grid lg:grid-cols-[240px_1fr] gap-4 lg:gap-8 py-5">
@@ -21,6 +23,8 @@ export const Section = ({ title, desc, children }) => (
 export const Field = ({ label, children }) => (
   <label className="block"><span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>{children}</label>
 );
+
+const Locked = ({ title, desc, what, text, testid }) => <Section title={title} desc={desc}><ProNote what={what} text={text} testid={testid} /></Section>;
 
 const Pick = ({ value, onChange, items, testid }) => (
   <Select value={value} onValueChange={onChange}>
@@ -57,6 +61,10 @@ export default function SettingsPanel() {
   const [s, setS] = useState(null);
   const [saving, setSaving] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+  const { billing } = useBilling();
+  const pro = billing?.sub.pro;
+  const team = billing?.sub.team;
+  const teamFull = Boolean(team) && s?.allowed_emails.length >= team - 1;
   useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); }, []);
   if (!s) return <div className="p-8 text-muted-foreground/80">Loading…</div>;
 
@@ -123,15 +131,18 @@ export default function SettingsPanel() {
             className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add FAQ</button>
         </Section>
 
-        <NotionSection Section={Section} />
+        {pro === false ? <Locked title="Notion knowledge" desc="Let the AI read your Notion pages — shop info, FAQs, prices and policies." what="Notion knowledge" testid="pro-lock-notion" />
+          : <NotionSection Section={Section} />}
 
         <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
 
         <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own).">
+          {team && <p className="text-xs text-muted-foreground" data-testid="team-limit">Your plan includes {team >= 1000 ? "unlimited" : team} login{team === 1 ? "" : "s"} (you{team > 1 ? ` + ${team >= 1000 ? "any number of" : team - 1} teammate${team === 2 ? "" : "s"}` : ""}).</p>}
+          {teamFull && <ProNote testid="pro-lock-team" text={team === 1 ? "Teammate logins are included in the Pro and Business plans." : "You've used all the logins in your plan. Upgrade to add more teammates."} />}
           <div className="flex gap-2">
-            <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@gmail.com" type="email" data-testid="allowed-email-input"
+            <Input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@gmail.com" type="email" data-testid="allowed-email-input" disabled={teamFull}
               onKeyDown={(e) => e.key === "Enter" && addEmail()} />
-            <button onClick={addEmail} data-testid="add-allowed-email-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-4 text-sm hover:bg-muted/60"><Plus className="h-4 w-4" /> Add</button>
+            <button onClick={addEmail} disabled={teamFull} data-testid="add-allowed-email-btn" className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-4 text-sm hover:bg-muted/60 disabled:opacity-50"><Plus className="h-4 w-4" /> Add</button>
           </div>
           <div className="flex flex-wrap gap-2" data-testid="allowed-emails-list">
             {s.allowed_emails.length === 0 && <p className="text-xs text-muted-foreground/80">No Google accounts yet — add your Gmail, then click Save.</p>}
@@ -158,12 +169,14 @@ export default function SettingsPanel() {
             className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"><Plus className="h-4 w-4" /> Add quick reply</button>
         </Section>
 
-        <VoiceSection s={s} setS={setS} Section={Section} Field={Field} />
+        {pro === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
+          text="Voice replies and the seller voice clone are included in the Pro and Business plans." />
+          : <VoiceSection s={s} setS={setS} Section={Section} Field={Field} />}
 
         <Section title="AI behaviour" desc="Model, tone and language for every reply.">
           <div className="grid sm:grid-cols-3 gap-4">
             <Field label="AI model">
-              <Pick value={s.model} onChange={set("model")} testid="model-select" items={[["claude", "Claude Sonnet 4.5"], ["gemini", "Gemini 3 Flash"]]} />
+              <Pick value={s.model} onChange={set("model")} testid="model-select" items={[["luna", "GPT 6 Luna (fast, low cost)"], ["claude", "Claude Sonnet 4.5"], ["gemini", "Gemini 3 Flash"]]} />
             </Field>
             <Field label="Tone">
               <Pick value={s.tone} onChange={set("tone")} testid="tone-select" items={[["friendly", "Friendly"], ["professional", "Professional"], ["direct", "Short & direct"], ["witty", "Witty"]]} />
