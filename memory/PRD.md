@@ -201,3 +201,11 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Public /privacy, /terms, /data-deletion pages (Legal.jsx, contact mond24036@gmail.com) + landing footer links — required by Meta to publish
 - Manual Messenger setup hidden from shops (only platform admin, or shops already using it)
 - Still needed for OTHER shops' Pages: Business verification + App Review (Advanced Access for pages_show_list, pages_messaging, pages_manage_metadata). Preview URL used in Meta; after deploy update redirect URI + press "Set up message webhook" on live site
+
+## Iteration 25 (2026-10) — "Continue with Facebook" sign-in / sign-up
+- User wanted website login as direct as the Facebook click → blue Continue/Sign up with Facebook on /login + /signup (shown only when META app configured; GET /api/auth/facebook/available)
+- POST /api/auth/facebook/start (rate-limited) → same Facebook dialog + same registered callback (/api/meta/facebook/callback, state.purpose="login"), scopes public_profile,email + the 3 Page permissions → one step signs in AND shares the Page
+- Identity: users.fb_uid first; else Facebook-confirmed email via shared auth.sign_in_verified() (same as Google: team join, unverified-password takeover protection); else fb-{id}@facebook.local account. New shop is named after the first shared Page
+- Shared Pages saved as pending fb_choices → user lands on /dashboard/channels which auto-connects a single Page
+- Session handoff: one-time login code (db.login_codes, 2-min TTL) → /auth/facebook page → POST /api/auth/facebook/finish → normal JWT (token never in URL)
+- Verified: tests/check_facebook_login.py (Graph STUBBED) 8 scenarios pass; real button reaches Facebook login with the real app. Not yet tried by a real person end to end

@@ -4,6 +4,7 @@ import { AuthShell, authCard, googleBtn, Divider } from "@/components/AuthShell"
 import { useAuth, errMsg } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { GoogleIcon, googleRedirect } from "@/pages/Login";
+import { FacebookLoginButton } from "@/components/FacebookLoginButton";
 
 export default function Signup() {
   const { user, register } = useAuth();
@@ -41,9 +42,12 @@ export default function Signup() {
           {busy ? "Creating…" : "Create account"}
         </button>
         <Divider />
-        <button type="button" onClick={googleRedirect} data-testid="signup-google-btn" className={googleBtn}>
-          <GoogleIcon /> Sign up with Google
-        </button>
+        <div className="space-y-3">
+          <FacebookLoginButton label="Sign up with Facebook" onError={setError} testid="signup-facebook-btn" />
+          <button type="button" onClick={googleRedirect} data-testid="signup-google-btn" className={googleBtn}>
+            <GoogleIcon /> Sign up with Google
+          </button>
+        </div>
         <p className="text-sm text-muted-foreground text-center mt-6">Already have an account? <Link to="/login" className="text-primary hover:underline underline-offset-4 font-semibold" data-testid="go-login-link">Sign in</Link></p>
       </form>
     </AuthShell>

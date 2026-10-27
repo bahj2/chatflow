@@ -27,6 +27,9 @@ async def startup():
     await db.oauth_states.create_index("state", unique=True)
     await db.oauth_states.create_index("exp", expireAfterSeconds=0)
     await db.fb_choices.create_index("business_id", unique=True)
+    await db.login_codes.create_index("code", unique=True)
+    await db.login_codes.create_index("exp", expireAfterSeconds=0)
+    await db.users.create_index("fb_uid", sparse=True)
     await db.fb_choices.create_index("exp", expireAfterSeconds=0)
     await db.settings.create_index("fb_page_id", sparse=True)
     try:

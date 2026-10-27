@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import secrets
+from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, urlparse
 
@@ -13,16 +14,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from pydantic import BaseModel
 
-from core import db, logger, now_iso, current_user, owner_only, superadmin, get_settings  # loads .env first
+from core import db, logger, now_iso, current_user, owner_only, superadmin, get_settings, is_owner, client_ip, rate_ok, member_problem  # loads .env first
 import notion_kb as N  # noqa: E402
 from routers.settings import FB_TAKEN, taken_by_other
 from routers.webhooks import dispatch_messenger
+from routers.auth import issue_token, sign_in_verified, create_business
 
 router = APIRouter(prefix="/api")
 
 GRAPH_VERSION = "v26.0"
 GRAPH = f"https://graph.facebook.com/{GRAPH_VERSION}"
 SCOPES = "pages_show_list,pages_messaging,pages_manage_metadata"
+LOGIN_SCOPES = "public_profile,email," + SCOPES  # sign in AND share the Page in one Facebook step
 CALLBACK_PATH = "/api/meta/facebook/callback"
 WEBHOOK_PATH = "/api/webhooks/meta/page"
 
@@ -102,26 +105,134 @@ async def facebook_callback(code: str = "", state: str = "", error: str = "", er
     row = await db.oauth_states.find_one_and_delete({"state": state}) if state else None
     if not row or row["exp"].replace(tzinfo=timezone.utc) < now():
         raise HTTPException(400, "This Facebook sign-in link has expired. Go back to Channels and press Connect with Facebook again.")
+    if row.get("purpose") == "login":
+        return await finish_facebook_login(row, code, error_description or error)
     back = f"{row['return_url']}/dashboard/channels"
     if error or not code:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': error_description or 'Facebook sign-in was cancelled.'})}")
     c = cfg()
     try:
-        short = (await graph("GET", "oauth/access_token", client_id=c["APP_ID"], client_secret=c["APP_SECRET"],
-                             redirect_uri=row["redirect_uri"], code=code))["access_token"]
-        user_token = (await graph("GET", "oauth/access_token", grant_type="fb_exchange_token", client_id=c["APP_ID"],
-                                  client_secret=c["APP_SECRET"], fb_exchange_token=short))["access_token"]
-        # /me/accounts already returns each Page's own token (only pages_show_list needed, no extra permission)
-        pages = (await graph("GET", "me/accounts", fields="id,name,access_token", limit=100, access_token=user_token)).get("data", [])
+        user_token = await user_token_from_code(c, row["redirect_uri"], code)
+        pages = await shared_pages(user_token)
     except GraphError as e:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': str(e)})}")
     if not pages:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': 'No Facebook Page was shared. Press Connect again and tick your Page, or make sure you are an admin of the Page.'})}")
-    await db.fb_choices.update_one({"business_id": row["business_id"]}, {"$set": {
-        "business_id": row["business_id"], "user_token_enc": N.seal(user_token),
+    await save_choice(row["business_id"], user_token, pages)
+    return RedirectResponse(f"{back}?fb=pick")
+
+
+async def user_token_from_code(c: dict, redirect_uri: str, code: str) -> str:
+    short = (await graph("GET", "oauth/access_token", client_id=c["APP_ID"], client_secret=c["APP_SECRET"],
+                         redirect_uri=redirect_uri, code=code))["access_token"]
+    return (await graph("GET", "oauth/access_token", grant_type="fb_exchange_token", client_id=c["APP_ID"],
+                        client_secret=c["APP_SECRET"], fb_exchange_token=short))["access_token"]
+
+
+async def shared_pages(user_token: str) -> list:
+    # /me/accounts already returns each Page's own token (only pages_show_list needed, no extra permission)
+    return (await graph("GET", "me/accounts", fields="id,name,access_token", limit=100, access_token=user_token)).get("data", [])
+
+
+async def save_choice(bid: str, user_token: str, pages: list):
+    await db.fb_choices.update_one({"business_id": bid}, {"$set": {
+        "business_id": bid, "user_token_enc": N.seal(user_token),
         "pages": [{"id": str(p["id"]), "name": p.get("name") or "", "token_enc": N.seal(p["access_token"]) if p.get("access_token") else ""}
                   for p in pages], "exp": now() + timedelta(hours=1)}}, upsert=True)
-    return RedirectResponse(f"{back}?fb=pick")
+
+
+# ---------- "Continue with Facebook" sign-in / sign-up (same Meta app, same callback address) ----------
+@router.get("/auth/facebook/available")
+async def facebook_login_available():
+    return {"available": available()}
+
+
+@router.post("/auth/facebook/start")
+async def facebook_login_start(body: StartIn, request: Request):
+    if not available():
+        raise HTTPException(503, "Facebook sign-in isn't switched on yet. Please use email or Google.")
+    if not await rate_ok([(f"fblogin:{client_ip(request)}", 30, 3600)]):
+        raise HTTPException(429, "Too many attempts from this network. Try again later.")
+    c = cfg()
+    state = secrets.token_urlsafe(32)
+    redirect_uri = clean_base(body.base_url) + CALLBACK_PATH
+    await db.oauth_states.insert_one({"state": state, "purpose": "login", "business_id": None, "redirect_uri": redirect_uri,
+                                      "return_url": clean_base(body.return_url), "exp": now() + timedelta(minutes=10)})
+    q = {"client_id": c["APP_ID"], "redirect_uri": redirect_uri, "state": state, "response_type": "code"}
+    if c["LOGIN_CONFIG_ID"]:
+        q["config_id"] = c["LOGIN_CONFIG_ID"]
+    else:
+        q["scope"] = LOGIN_SCOPES
+    return {"url": f"https://www.facebook.com/{GRAPH_VERSION}/dialog/oauth?{urlencode(q)}"}
+
+
+async def finish_facebook_login(row: dict, code: str, error: str):
+    fail = lambda msg: RedirectResponse(f"{row['return_url']}/login?{urlencode({'fb_error': msg})}")  # noqa: E731
+    if error or not code:
+        return fail("Facebook sign-in was cancelled." if not error or "denied" in error.lower() or "permission" in error.lower() else error)
+    try:
+        user_token = await user_token_from_code(cfg(), row["redirect_uri"], code)
+        me = await graph("GET", "me", fields="id,name,email,picture.type(large)", access_token=user_token)
+        pages = await shared_pages(user_token)
+    except GraphError as e:
+        return fail(str(e))
+    fb_uid, name = str(me["id"]), me.get("name") or "Facebook user"
+    picture = ((me.get("picture") or {}).get("data") or {}).get("url")
+    password_off, created = False, False
+    user = await db.users.find_one({"fb_uid": fb_uid}, {"_id": 0})
+    try:
+        if user:
+            problem = await member_problem(user)
+            if problem:
+                raise HTTPException(403, problem)
+            await db.users.update_one({"id": user["id"]}, {"$set": {"picture": picture or user.get("picture")}})
+        elif me.get("email"):  # Facebook only shares emails it has confirmed
+            user, password_off, created = await sign_in_verified(me["email"], name, picture, "facebook")
+            await db.users.update_one({"id": user["id"]}, {"$set": {"fb_uid": fb_uid}})
+        else:  # Facebook account without an email: the Facebook ID is the identity
+            uid = str(uuid4())
+            bid = await create_business(f"{name}'s business", uid)
+            user = {"id": uid, "email": f"fb-{fb_uid}@facebook.local", "name": name, "picture": picture, "role": "owner",
+                    "auth": "facebook", "fb_uid": fb_uid, "business_id": bid, "email_verified": True, "created_at": now_iso()}
+            await db.users.insert_one(dict(user))
+            created = True
+    except HTTPException as e:
+        return fail(e.detail)
+    bid = user["business_id"]
+    if created and user.get("role") == "owner" and pages:  # new shop: name it after the Page
+        shop = (pages[0].get("name") or "").strip()[:80]
+        if shop:
+            await db.businesses.update_one({"id": bid}, {"$set": {"name": shop}})
+            await db.settings.update_one({"business_id": bid}, {"$set": {"business_name": shop}})
+    pending = False
+    if pages and is_owner(user):
+        s = await get_settings(bid)
+        if not (s.fb_oauth and s.fb_page_id):  # not connected yet: the Page they just ticked connects on the next screen
+            await save_choice(bid, user_token, pages)
+            pending = True
+    one_time = secrets.token_urlsafe(32)
+    await db.login_codes.insert_one({"code": one_time, "user_id": user["id"], "password_off": password_off, "pending": pending,
+                                     "new": created, "exp": now() + timedelta(minutes=2)})
+    return RedirectResponse(f"{row['return_url']}/auth/facebook?{urlencode({'code': one_time})}")
+
+
+class FinishIn(BaseModel):
+    code: str
+
+
+@router.post("/auth/facebook/finish")
+async def facebook_login_finish(body: FinishIn):
+    """Swaps the one-time code from the Facebook redirect for a normal session (the session token never sits in a URL)."""
+    row = await db.login_codes.find_one_and_delete({"code": body.code})
+    if not row or row["exp"].replace(tzinfo=timezone.utc) < now():
+        raise HTTPException(401, "This Facebook sign-in has expired. Please press Continue with Facebook again.")
+    user = await db.users.find_one({"id": row["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(401, "Account not found")
+    problem = await member_problem(user)
+    if problem:
+        raise HTTPException(403, problem)
+    return {**await issue_token(user), "password_off": row["password_off"], "pending_pages": row["pending"], "new": row["new"]}
 
 
 @router.get("/meta/facebook/pages")

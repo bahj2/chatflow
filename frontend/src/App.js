@@ -10,6 +10,7 @@ import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
 import AuthCallback from "@/pages/AuthCallback";
 import Legal from "@/pages/Legal";
+import FacebookAuth from "@/pages/FacebookAuth";
 
 const Protected = ({ children }) => {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/demo" element={<Demo />} />
+      <Route path="/auth/facebook" element={<FacebookAuth />} />
       <Route path="/privacy" element={<Legal />} />
       <Route path="/terms" element={<Legal />} />
       <Route path="/data-deletion" element={<Legal />} />
