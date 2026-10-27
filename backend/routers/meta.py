@@ -76,8 +76,11 @@ async def meta_status(user=Depends(current_user)):
     pending = bool(ch and ch["exp"].replace(tzinfo=timezone.utc) > now())  # came back from Facebook, Page not picked yet
     u = await db.users.find_one({"id": user.get("id")}, {"_id": 0, "fb_token_exp": 1}) or {}
     remembered = bool(u.get("fb_token_exp") and u["fb_token_exp"].replace(tzinfo=timezone.utc) > now())
-    return {"available": available(), "connected": bool(s.fb_oauth and s.fb_page_id), "page_id": s.fb_page_id if s.fb_oauth else "",
-            "page_name": s.fb_page_name if s.fb_oauth else "", "pending": pending, "remembered": remembered}
+    by_token = bool(not s.fb_oauth and s.fb_page_token and s.fb_page_id and s.fb_app_secret)
+    connected = bool(s.fb_page_id and (s.fb_oauth or by_token))
+    return {"available": available(), "connected": connected, "via": "facebook" if s.fb_oauth else "token" if by_token else "",
+            "page_id": s.fb_page_id if connected else "", "page_name": s.fb_page_name if connected else "",
+            "pending": pending, "remembered": remembered}
 
 
 class StartIn(BaseModel):
@@ -318,11 +321,74 @@ async def unsubscribe(page_id: str, token: str):
 @router.delete("/meta/facebook")
 async def facebook_disconnect(user=Depends(owner_only)):
     s = await get_settings(user["business_id"])
-    if s.fb_oauth and s.fb_page_id:
-        await unsubscribe(s.fb_page_id, s.fb_page_token)
+    if s.fb_page_token:
+        if s.fb_page_id:
+            await unsubscribe(s.fb_page_id, s.fb_page_token)
         await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {
-            "fb_page_token": "", "fb_page_id": "", "fb_page_name": "", "fb_oauth": False}})
+            "fb_page_token": "", "fb_page_id": "", "fb_page_name": "", "fb_oauth": False, "fb_app_secret": "", "fb_verify_token": ""}})
     return {"ok": True}
+
+
+# ---------- "Like Telegram": paste the Page token + App secret from the shop's OWN Meta app, we do the rest ----------
+class TokenIn(BaseModel):
+    page_token: str
+    app_secret: str
+    base_url: str
+
+
+@router.post("/meta/facebook/token")
+async def facebook_token_connect(body: TokenIn, user=Depends(owner_only)):
+    bid = user["business_id"]
+    tok, secret = body.page_token.strip(), body.app_secret.strip()
+    if not tok or not secret:
+        raise HTTPException(400, "Paste both the Page token and the App secret.")
+    try:  # the token tells us which app and Page it belongs to
+        info = (await graph("GET", "debug_token", input_token=tok, access_token=tok)).get("data", {})
+    except GraphError:
+        raise HTTPException(400, "This Page token isn't valid. Generate a new one in your Meta app (Messenger API Settings → Generate token) and paste it again.")
+    if not info.get("is_valid"):
+        raise HTTPException(400, "This Page token has expired or was removed. Generate a new one and paste it again.")
+    app_id = str(info.get("app_id") or "")
+    if info.get("type") == "USER":  # pasted the personal token: use the Page token behind it when there is one Page
+        try:
+            pages = await shared_pages(tok)
+        except GraphError:
+            pages = []
+        if len(pages) != 1 or not pages[0].get("access_token"):
+            raise HTTPException(400, "That is your personal token. Please paste the Page token (Messenger API Settings → your Page → Generate token).")
+        tok = pages[0]["access_token"]
+    try:
+        me = await graph("GET", "me", fields="id,name", access_token=tok)
+    except GraphError as e:
+        raise HTTPException(400, f"Facebook didn't accept this Page token: {e}")
+    page_id, page_name = str(me["id"]), me.get("name") or ""
+    try:
+        app_tok = (await graph("GET", "oauth/access_token", client_id=app_id, client_secret=secret, grant_type="client_credentials"))["access_token"]
+    except GraphError:
+        raise HTTPException(400, "The App secret doesn't match this Page token's app. Copy it from App settings → Basic → App secret → Show.")
+    if await taken_by_other(bid, {"fb_page_id": page_id}):
+        raise HTTPException(409, FB_TAKEN)
+    cur = await get_settings(bid)
+    if cur.fb_oauth and cur.fb_page_id and cur.fb_page_id != page_id:
+        await unsubscribe(cur.fb_page_id, cur.fb_page_token)
+    verify = secrets.token_urlsafe(24)
+    # save first: Facebook checks the webhook (with this verify token) the moment we register it
+    await db.settings.update_one({"business_id": bid}, {"$set": {
+        "fb_page_token": tok, "fb_app_secret": secret, "fb_verify_token": verify, "fb_page_id": page_id,
+        "fb_page_name": page_name, "fb_oauth": False}})
+    callback = clean_base(body.base_url) + f"/api/webhooks/messenger/{bid}"
+    try:
+        async with httpx.AsyncClient(timeout=30) as h:
+            r = await h.post(f"{GRAPH}/{app_id}/subscriptions", params={"access_token": app_tok},
+                             data={"object": "page", "callback_url": callback, "fields": "messages", "verify_token": verify})
+        hook = r.json()
+        if r.status_code >= 400 or not hook.get("success"):
+            raise GraphError((hook.get("error") or {}).get("message") or "Facebook refused the webhook")
+        await graph("POST", f"{page_id}/subscribed_apps", subscribed_fields="messages", access_token=tok)
+    except (GraphError, httpx.HTTPError, ValueError) as e:
+        raise HTTPException(400, f"The Page was found, but Facebook refused to send its messages here: {e}. Make sure Messenger is added to your Meta app.")
+    logger.info("facebook page %s connected by token to business %s", page_id, bid)
+    return {"ok": True, "page_id": page_id, "page_name": page_name}
 
 
 # ---------- Platform webhook (one URL for every shop, routed by Page ID) ----------

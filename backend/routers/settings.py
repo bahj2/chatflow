@@ -65,6 +65,9 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     if body.telegram_token and body.telegram_token != cur.telegram_token and await taken_by_other(bid, same_bot(body.telegram_token)):
         raise HTTPException(409, TG_TAKEN)
     body.fb_oauth, body.fb_page_name = cur.fb_oauth, cur.fb_page_name  # only the Connect with Facebook flow changes these
+    if user.get("role") != "superadmin":
+        # shops connect Facebook only with the Connect button or the Page-token box, never through this form
+        body = body.model_copy(update={k: getattr(cur, k) for k in ("fb_page_token", "fb_app_secret", "fb_verify_token", "fb_page_id")})
     if cur.fb_oauth:
         body.fb_page_token = cur.fb_page_token
     elif body.fb_page_token != cur.fb_page_token:

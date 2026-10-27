@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Copy, Facebook, CheckCircle2, Circle, Loader2, AlertTriangle, ChevronDown, ExternalLink, Unplug, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 import { api, errMsg, BACKEND_URL } from "@/lib/auth";
 import { OwnerOnly } from "@/components/SettingsPanel";
 
@@ -22,6 +23,55 @@ const FbButton = ({ onClick, busy, disabled, label, testid }) => (
 );
 
 /** Shop side: one click to log in with Facebook, pick the Page, done. Manual token setup stays available as "advanced". */
+/** "Like Telegram": paste the Page token + App secret from your own Meta app; the server sets up everything else. */
+function TokenConnect({ onDone }) {
+  const [tok, setTok] = useState("");
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [help, setHelp] = useState(false);
+  const privacy = `${window.location.origin}/privacy`;
+  const go = async () => {
+    setBusy(true); setErr("");
+    try {
+      const { data } = await api.post("/meta/facebook/token", { page_token: tok, app_secret: secret, base_url: BACKEND_URL });
+      toast.success(`Messenger connected to ${data.page_name || "your Page"}`);
+      setTok(""); setSecret("");
+      onDone?.();
+    } catch (e) { setErr(errMsg(e)); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3" data-testid="fb-token-connect">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="space-y-1.5 text-xs font-medium text-muted-foreground">Page token
+          <Input type="password" value={tok} onChange={(e) => setTok(e.target.value)} placeholder="EAAG…" data-testid="fb-token-input" />
+        </label>
+        <label className="space-y-1.5 text-xs font-medium text-muted-foreground">App secret
+          <Input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="32 letters and numbers" data-testid="fb-secret-input" />
+        </label>
+      </div>
+      {err && <p className="text-sm text-red-600 dark:text-red-400" data-testid="fb-token-error">{err}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={go} disabled={busy || !tok.trim() || !secret.trim()} data-testid="fb-token-connect-btn"
+          className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2 text-sm font-semibold disabled:opacity-60">
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Connect
+        </button>
+        <button onClick={() => setHelp((v) => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary" data-testid="fb-token-help-toggle">
+          <ChevronDown className={`h-3.5 w-3.5 transition ${help ? "rotate-180" : ""}`} /> How do I get these? (5 minutes, once)
+        </button>
+      </div>
+      {help && (
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-muted-foreground marker:font-semibold" data-testid="fb-token-help">
+          <li>Open <a href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer" className="text-primary inline-flex items-center gap-1">Meta for Developers <ExternalLink className="h-3 w-3" /></a> → <b>Create app</b> → choose <b>“Engage with customers on Messenger from Meta”</b> → <b>Create app</b>.</li>
+          <li><b>Use cases → Customize → Messenger API Settings</b> → <b>Generate access tokens</b> → connect your Page → <b>Generate</b> → copy it into <b>Page token</b>.</li>
+          <li><b>App settings → Basic</b> → <b>App secret → Show</b> → copy it into <b>App secret</b>. In <b>Privacy Policy URL</b> paste <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">{privacy}</code> → <b>Save</b>.</li>
+          <li>Press <b>Publish</b> in your Meta app so every customer can message, then press <b>Connect</b> here. We set up the rest automatically.</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
 /** allowManual: only the platform admin sees the manual (own Meta app) setup; shops that already use it keep it. */
 export function FacebookConnect({ owner, manual, manualConfigured, allowManual, onChanged }) {
   const [meta, setMeta] = useState(null);
@@ -140,14 +190,14 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
             <span className="grid place-items-center h-10 w-10 rounded-full shrink-0" style={{ backgroundColor: FB_BLUE }}><Facebook className="h-5 w-5 text-white" fill="white" strokeWidth={0} /></span>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate" data-testid="fb-page-name">{meta.page_name || "Your Facebook Page"}</p>
-              <p className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Connected — Messenger chats arrive in your Inbox</p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Connected{meta.via === "token" ? " with your Page token" : ""} — Messenger chats arrive in your Inbox</p>
             </div>
           </div>
           {owner && (
             <div className="flex gap-2">
-              <button onClick={start} disabled={!!busy} data-testid="fb-change-page-btn" className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted/60 disabled:opacity-60">
+              {meta.via !== "token" && <button onClick={start} disabled={!!busy} data-testid="fb-change-page-btn" className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold hover:bg-muted/60 disabled:opacity-60">
                 {busy === "start" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Change page
-              </button>
+              </button>}
               <button onClick={disconnect} disabled={!!busy} data-testid="fb-disconnect-btn" className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-red-600 dark:hover:text-red-400 disabled:opacity-60">
                 {busy === "off" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unplug className="h-3.5 w-3.5" />} Disconnect
               </button>
@@ -172,13 +222,20 @@ export function FacebookConnect({ owner, manual, manualConfigured, allowManual, 
           </div>
           <button onClick={start} disabled={!!busy} className="text-xs text-primary hover:underline underline-offset-4" data-testid="fb-page-not-listed">Page not in the list? Choose it on Facebook</button>
         </div>
-      ) : meta.available ? (
-        <div className="space-y-2">
-          <FbButton onClick={meta.remembered ? quick : start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : busy === "start" ? "Pick your Page in the Facebook window…" : "Connect with Facebook"} testid="fb-connect-btn" />
-          <p className="text-xs text-muted-foreground">A small Facebook window opens — tick your Page and press Continue. You stay on this page. You need to be an admin of the Page.</p>
-        </div>
       ) : (
-        <p className="text-sm text-muted-foreground" data-testid="fb-not-available">One-click “Connect with Facebook” is coming soon.{canManual ? " You can connect manually below." : " Please contact Replyflow AI support to connect your Page."}</p>
+        <div className="space-y-4">
+          {meta.available && (
+            <div className="space-y-2">
+              <FbButton onClick={meta.remembered ? quick : start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : busy === "start" ? "Pick your Page in the Facebook window…" : "Connect with Facebook"} testid="fb-connect-btn" />
+              <p className="text-xs text-muted-foreground">A small Facebook window opens — tick your Page and press Continue. You stay on this page. You need to be an admin of the Page.</p>
+            </div>
+          )}
+          <div className={meta.available ? "border-t border-border pt-4 space-y-2" : "space-y-2"}>
+            <p className="text-sm font-semibold">{meta.available ? "Or paste your Page token — like Telegram" : "Paste your Page token — like Telegram"}</p>
+            <p className="text-xs text-muted-foreground">Works right away with your own Meta app. Paste 2 things and press Connect — we set up the webhook for you.</p>
+            <TokenConnect onDone={() => { load(); onChanged?.(); }} />
+          </div>
+        </div>
       )}
 
       {owner && !meta.connected && manual && canManual && (

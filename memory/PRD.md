@@ -221,3 +221,11 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Popup blocked → same-tab redirect fallback; popup opened as a tab without opener → /fb-done continues to /dashboard/channels; closed early → status re-check (guarded against double finish)
 - /api/meta/status returns remembered → button uses instant quick connect when the person's Facebook approval is remembered, otherwise the popup
 - Browser-verified: popup opens real Facebook, main page stays on Channels, /fb-done closes itself and the picker appears (desktop + 390 px, no overflow)
+
+## Iteration 28 (2026-10) — Facebook "like Telegram" (paste Page token)
+- Why: clients without a role on the platform Meta app get "Feature Unavailable" until Tech Provider + Business verification + App Review. Shop's OWN Meta app needs no review for its own Page (proved with Replyflow AI page)
+- POST /api/meta/facebook/token {page_token, app_secret, base_url} (owner): debug_token (token inspects itself → app_id, type), personal token with one Page → uses that Page token, /me → page id/name, app secret checked via client_credentials, taken check, saves token/secret/new verify token, registers the shop's per-shop webhook (/api/webhooks/messenger/{bid}) on THEIR app via /{app_id}/subscriptions (Meta verifies instantly), subscribes Page (subscribed_apps). Clear errors for bad/expired token or wrong secret
+- /api/meta/status: connected for token mode too, via = facebook|token; Disconnect clears token mode too
+- PUT /settings: non-superadmin can't change fb_* fields (stale forms can't wipe a connection)
+- Channels: blue button + "Or paste your Page token — like Telegram" (2 fields + Connect + 4-step how-to with our /privacy URL); connected card shows "with your Page token" (no Change page)
+- tests/check_facebook_token.py (Graph STUBBED) all pass; real Graph rejects a bad token with the friendly message; UI desktop + 390 ok
