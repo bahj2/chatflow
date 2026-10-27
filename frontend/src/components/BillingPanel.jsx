@@ -45,7 +45,7 @@ const CurrentPlan = ({ s, topup, canTopup, onBuy, busy }) => {
           <p className="font-display text-2xl font-bold mt-1 flex items-center gap-3"><span data-testid="billing-plan-name">{s.plan_name}</span><Pill cls={cls} testid="billing-plan-status">{label}</Pill></p>
           {!s.exempt && <p className="text-sm text-muted-foreground mt-1" data-testid="billing-days-left">{s.active ? `${s.days_left} day${s.days_left === 1 ? "" : "s"} left · ${s.plan === "trial" ? "ends" : "paid until"} ${day(s.paid_until)}` : `Ended ${day(s.paid_until)}`}</p>}
         </div>
-        {!s.exempt && s.plan !== "trial" && (
+        {!s.exempt && s.plan !== "trial" && s.active && (
           <button onClick={onBuy} disabled={!canTopup || busy} data-testid="billing-topup-btn" className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} {topup.replies.toLocaleString()} more replies · ${topup.price}
           </button>

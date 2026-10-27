@@ -1,0 +1,37 @@
+{
+  "summary": "Backend + frontend test of the server.py module split, subscriptions/billing (Bakong KHQR invoices, admin confirm, admin Set plan), Pro gating and the new Billing/Admin UI. Backend: new pytest suite tests/test_iter21_billing_refactor.py, 28/28 pass when run serially (-n 0). It covers auth, settings GET/PUT (409 for a Telegram bot already used by another shop, 402 team limit), conversations list/messages/patch/reply, cross-shop 404, suggest + summary returning 200 for a TRIAL shop, /ai/test, product CRUD + media/image upload, orders 404s, payments/preview 400, notion/channels/stats GETs, webhook 403s, and Pro gating: trial gets 402 on voice/test, notion/connect, notion/sync and seller-voice. After admin Set plan -> Pro: 400/424 instead of 402, team limit 3 (2 emails saved, 3rd = 402). Same plan again adds the days. Set plan error codes checked: 400 exempt, 404, 422 for bad plan/days, 403 for a shop owner. Billing shape checked. Checkout checked: 503 with no Bakong; 400 for topup on trial or unknown item; a pending invoice in local mode, and the same invoice on repeat; qr.png returns 200 image/png without auth (404 for an unknown id). Invoice GET checked: own shop only (404 for other shops), no qr/md5 leaked. Admin invoice confirm checked: 403 for an owner, plan turns on, 409 when already paid; topup confirm adds 1000 extra. admin/businesses: every row has billing (a trial is created on the fly when the subscription is missing), plus ai_cost_month/ai_calls_month/revenue. Paused reasons used_up and ended both work, and Pro is lost when the plan ends. Frontend (1920x1080 + 390 mobile billing): trial shop inbox shows the summary panel and 3 suggested replies with no Pro lock. Billing page shows all testids, the Starter/Pro feature lists match the spec, and Choose plan opens the pay dialog where the KHQR image loads (naturalWidth 600) with a countdown; history table shown. Settings for a trial shop: pro-lock-notion (upgrade link goes to /dashboard/billing), pro-lock-voice, pro-lock-team, 'Your plan includes 1 login (you).', email input and add button disabled; seller name and greeting edited, saved and kept after reload. Admin Businesses: 6 stats, the pending invoice shown, the 2-click 'Money received' works (row disappears, empty state shows, Paying shops 0->1, revenue $10); Plan and AI cost columns shown; Set plan buttons on 9 of 10 rows (the platform row shows 'Platform'); Set plan dialog -> Pro shows 'Pro 30 d left 0/3,000'. Pro shop settings: notion-section, voice-replies-switch, khmer-voice-card and seller-voice are visible; 2 teammates added, saved and kept; then the input is disabled. paused-banner shows for used_up ('Buy more replies') and for ended ('Choose a plan'), and an ended Pro is locked again. No page JS errors. All test data cleaned up, and the admin's bakong_account_id is restored to ''.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "billing.view() / PUT /api/settings", "issue": "When a Pro/Business plan has ENDED, view() still returns team = plan team (3/10) while pro=false. So an ended Pro shop can still add 2 teammates, and the UI says 'Your plan includes 3 logins'. Suggest team = 1 when not active (trial/ended), unless exempt."},
+      {"endpoint": "POST /api/conversations/{id}/suggest, POST /api/ai/test", "issue": "These pass N.knowledge() (Notion KB) into the prompt for every plan. handle_incoming only does this when plan['pro']. A shop that was downgraded from Pro (Notion link still stored) keeps getting Notion knowledge in suggestions and AI tests. Gate it with plan['pro'] the same way, or delete notion_links when Pro ends."},
+      {"endpoint": "billing.activate()", "issue": "Switching plans (e.g. Pro -> Starter, or admin Set plan to a different plan) starts the new plan now and silently drops the paid days left on the old plan. This is documented in the UI text ('switching plans starts a new 30-day period'), so it is only a product decision to confirm."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Billing (plan ended)", "issues": ["The disabled '+1,000 more replies · $5' button still shows when the plan has ended. Hiding it when !s.active would be cleaner."]},
+      {"screen": "Admin Businesses table", "issues": ["Plan cell sub-line '30 d left · 0/3,000' wraps onto 2 lines in the narrow Plan column at 1920px. Cosmetic."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter21_billing_refactor.py", "/app/backend/tests/seed_iter21_ui.py", "/app/test_reports/pytest/iter21.xml"],
+  "action_items": [
+    "Optional: make sub.team = 1 for inactive (ended) non-exempt plans so ended Pro shops can't add teammates",
+    "Optional: only use Notion knowledge in /suggest and /ai/test when the shop has Pro (same as handle_incoming)",
+    "Optional: hide the top-up button on the Billing page when the plan has ended"
+  ],
+  "critical_code_review_comments": [
+    "The refactor looks clean: routes are split by domain and every file is under 300 lines (notion_kb 300).",
+    "Backend log has one old 500 on /api/billing/checkout (object storage upload of invoice_qr). It comes from the OLD billing.py code (traceback line 227 in billing.py) from before the qr.png change. It did not happen again: checkout + qr.png pass now.",
+    "pytest.ini forces xdist -n 2 --dist loadscope. Module-scoped fixtures shared across classes get created once per worker, so the new suite must run with -n 0 (noted in the file header). Under -n 2 one assertion (ai_calls_month) failed only because each worker used a different shop.",
+    "GET /billing/invoices/{id}/qr.png is public by invoice UUID. That is acceptable because the QR only pays the platform account, and the invoice GET never returns qr/md5."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter21_billing_refactor.py", "/app/backend/tests/seed_iter21_ui.py"],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "100%"},
+  "seed_data_creation": "Temporary shops test_a_/test_b_/test_ui21_* and their conversations and invoices were created and then fully deleted. The admin's bakong_account_id was set to replyflow@aclb during the tests and restored to ''.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/test_iter21_billing_refactor.py -n 0. UI seed: python tests/seed_iter21_ui.py seed|cleanup (state in /tmp/iter21_ui.json; it sets and restores the admin Bakong). The preview server clock reads Oct 2026. In inbox the summary-strip is xl:hidden at 1920 (use summary-panel). The old unit tests that import server internals are obsolete after the split."
+}

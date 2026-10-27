@@ -159,6 +159,17 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - New: components/AuthShell.jsx (gradient showcase panel + form side) used by Login/Signup; Landing rebuilt (eyebrow pill, gradient headline, stat cards, 6 feature cards incl. Khmer voice + product photos, numbered steps, gradient CTA band, footer); Dashboard sidebar (business card, gradient active indicator, theme toggle); Settings sections are cards
 - iteration_20: frontend 100% pass (both themes, 1920 + 390)
 
+## Iteration 21 (2026-06) — Subscriptions (KHQR) + backend split
+- Plans (backend/billing.py): Free trial 14 d/200 replies, Starter $10/1,000, Pro $25/3,000, Business $59/8,000 (30 days), top-up +1,000 replies $5; AI replies pause when the plan ends or replies run out (messages still reach the inbox); real AI cost tracked per shop/month (db.ai_usage)
+- User choices: Pro/Business only = voice replies (Starter/trial answer voice messages in text), seller voice clone, Notion knowledge, team logins (1 / 3 / 10; ended plans = 1). NOT locked: AI summaries, suggested replies, seller name & greeting
+- Payments: shops pay the platform admin's Bakong account (admin's AI Settings → Bakong KHQR). Auto turn-on when the admin's business has a KHQR.dev token (relay poll); otherwise admin confirms in Businesses → "Plan payments to check" (pending + expired, last 2 days, 2-click). Admin can also "Set plan" per shop (POST /api/admin/businesses/{bid}/plan {plan, days}; same plan running → days added)
+- Fix: invoice QR no longer uploaded to object storage (was HTTP 500); invoice keeps the KHQR string and GET /api/billing/invoices/{id}/qr.png renders it
+- Admin Businesses page: Paying shops + Plan revenue stats, Plan / AI cost columns, Set plan dialog
+- backend/server.py split (no behaviour change, same 48 routes + 2 new): core.py (env, db, auth deps, Settings, rate limit, require_pro, platform_settings), ai.py, conversations.py, orders.py (KHQR orders + payments loop), replies.py (handle_incoming, deliver), routers/{auth,admin,settings,webhooks,inbox,shop,voice,notion,channels,subscriptions}.py
+- iteration_21: backend 28/28 (tests/test_iter21_billing_refactor.py, run with -n 0), frontend 100%; minor follow-ups fixed after (ended plan team=1, Notion knowledge in suggest/ai-test only for Pro, top-up hidden when plan ended)
+- Old unit tests importing `server` internals (test_iter12/13/14/15 unit, check_unique_channels.py) are obsolete after the split
+
 ## Backlog
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
-- P2: Instagram/WhatsApp, analytics, widget colour/greeting customisation UI, team members
+- P1: Plan expiry reminders to shop owners; Khmer UI for Billing
+- P2: Instagram/WhatsApp, analytics, team members

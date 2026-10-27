@@ -71,7 +71,7 @@ def view(sub: dict) -> dict:
             "period_end": sub["period_end"], "paid_until": sub["paid_until"], "days_left": max(0, math.ceil((paid - t).total_seconds() / 86400)),
             "used": sub["used"], "limit": sub["limit"], "extra": sub["extra"], "extra_used": sub.get("extra_used", 0), "active": active,
             "paused": bool(reason), "reason": reason, "pro": sub["exempt"] or (plan["pro"] and active),
-            "team": 1000 if sub["exempt"] else plan["team"], "exempt": sub["exempt"]}
+            "team": 1000 if sub["exempt"] else plan["team"] if active else 1, "exempt": sub["exempt"]}
 
 
 async def sub_status(db, bid: str) -> dict:

@@ -18,7 +18,7 @@ export const PlanCell = ({ b }) => {
   return (
     <div className="leading-tight" data-testid={`admin-plan-${b.id}`}>
       <p className="font-semibold text-sm">{s.plan_name}</p>
-      <p className={`text-[11px] ${s.paused ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>{state} · {s.used.toLocaleString()}/{s.limit.toLocaleString()}</p>
+      <p className={`text-[11px] whitespace-nowrap ${s.paused ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`}>{state} · {s.used.toLocaleString()}/{s.limit.toLocaleString()}</p>
     </div>
   );
 };

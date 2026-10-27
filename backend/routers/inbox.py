@@ -70,12 +70,16 @@ async def manual_reply(cid: str, body: ReplyIn, user=Depends(current_user)):
     return msg
 
 
+async def pro_knowledge(bid: str) -> str:
+    return await N.knowledge(db, bid) if (await B.sub_status(db, bid))["pro"] else ""
+
+
 @router.post("/conversations/{cid}/suggest")
 async def suggest(cid: str, user=Depends(current_user)):
     await load_conv(cid, user["business_id"])
     s = await get_settings(user["business_id"])
     t = await transcript(cid)
-    ctx = system_prompt(s, await load_products(user["business_id"]), await N.knowledge(db, user["business_id"]))
+    ctx = system_prompt(s, await load_products(user["business_id"]), await pro_knowledge(user["business_id"]))
     raw = await llm(s, ctx, f"Conversation so far:\n{t}\n\nGive 3 different short ready-to-send replies to the customer's latest message "
                     "(e.g. one direct answer, one asking a clarifying question, one with a next step/offer). "
                     'Respond ONLY with a JSON array of 3 strings.', user["business_id"], "suggest")
@@ -92,7 +96,7 @@ async def suggest(cid: str, user=Depends(current_user)):
 async def ai_test(body: TestAIIn, user=Depends(current_user)):
     s = B.effective(await get_settings(user["business_id"]), await B.sub_status(db, user["business_id"]))
     products = await load_products(user["business_id"])
-    raw = await llm(s, system_prompt(s, products, await N.knowledge(db, user["business_id"])), f"Customer: {body.text}\n\nWrite the assistant's reply. Output only the reply text.",
+    raw = await llm(s, system_prompt(s, products, await pro_knowledge(user["business_id"])), f"Customer: {body.text}\n\nWrite the assistant's reply. Output only the reply text.",
                     user["business_id"], "test")
     reply, shown = split_show(raw, products)
     items = order_items(raw, products) if P.enabled(s) else []
