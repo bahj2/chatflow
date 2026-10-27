@@ -11,7 +11,7 @@ from routers.auth import create_business
 from core import db, get_settings, Settings
 
 CALLS = []
-PAGES = [{"id": "PAGE1", "name": "Dara Shop"}, {"id": "PAGE2", "name": "Dara Shop 2"}]
+PAGES = [{"id": "PAGE1", "name": "Dara Shop", "access_token": "PT_PAGE1"}, {"id": "PAGE2", "name": "Dara Shop 2", "access_token": "PT_PAGE2"}]
 
 
 async def fake_graph(method, path, **p):

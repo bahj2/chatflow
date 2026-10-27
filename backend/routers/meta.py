@@ -109,14 +109,16 @@ async def facebook_callback(code: str = "", state: str = "", error: str = "", er
                              redirect_uri=row["redirect_uri"], code=code))["access_token"]
         user_token = (await graph("GET", "oauth/access_token", grant_type="fb_exchange_token", client_id=c["APP_ID"],
                                   client_secret=c["APP_SECRET"], fb_exchange_token=short))["access_token"]
-        pages = (await graph("GET", "me/accounts", fields="id,name", limit=100, access_token=user_token)).get("data", [])
+        # /me/accounts already returns each Page's own token (only pages_show_list needed, no extra permission)
+        pages = (await graph("GET", "me/accounts", fields="id,name,access_token", limit=100, access_token=user_token)).get("data", [])
     except GraphError as e:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': str(e)})}")
     if not pages:
         return RedirectResponse(f"{back}?{urlencode({'fb_error': 'No Facebook Page was shared. Press Connect again and tick your Page, or make sure you are an admin of the Page.'})}")
     await db.fb_choices.update_one({"business_id": row["business_id"]}, {"$set": {
         "business_id": row["business_id"], "user_token_enc": N.seal(user_token),
-        "pages": [{"id": str(p["id"]), "name": p.get("name") or ""} for p in pages], "exp": now() + timedelta(hours=1)}}, upsert=True)
+        "pages": [{"id": str(p["id"]), "name": p.get("name") or "", "token_enc": N.seal(p["access_token"]) if p.get("access_token") else ""}
+                  for p in pages], "exp": now() + timedelta(hours=1)}}, upsert=True)
     return RedirectResponse(f"{back}?fb=pick")
 
 
@@ -125,7 +127,7 @@ async def facebook_pages(user=Depends(owner_only)):
     ch = await db.fb_choices.find_one({"business_id": user["business_id"]}, {"_id": 0})
     if not ch or ch["exp"].replace(tzinfo=timezone.utc) < now():
         raise HTTPException(404, "Press Connect with Facebook first.")
-    return [{**p, "taken": await taken_by_other(user["business_id"], {"fb_page_id": p["id"]})} for p in ch["pages"]]
+    return [{"id": p["id"], "name": p["name"], "taken": await taken_by_other(user["business_id"], {"fb_page_id": p["id"]})} for p in ch["pages"]]
 
 
 @router.post("/meta/facebook/pages/{page_id}/connect")
@@ -134,14 +136,15 @@ async def facebook_connect_page(page_id: str, user=Depends(owner_only)):
     ch = await db.fb_choices.find_one({"business_id": bid}, {"_id": 0})
     if not ch or ch["exp"].replace(tzinfo=timezone.utc) < now():
         raise HTTPException(404, "This Facebook sign-in has expired. Press Connect with Facebook again.")
-    if page_id not in {p["id"] for p in ch["pages"]}:
+    chosen = next((p for p in ch["pages"] if p["id"] == page_id), None)
+    if not chosen:
         raise HTTPException(403, "This Page wasn't shared with Replyflow AI.")
+    if not chosen.get("token_enc"):
+        raise HTTPException(400, "Facebook didn't give access to this Page. Press Connect with Facebook again and make sure you are an admin of the Page.")
     if await taken_by_other(bid, {"fb_page_id": page_id}):
         raise HTTPException(409, FB_TAKEN)
+    page = {"name": chosen["name"], "access_token": N.unseal(chosen["token_enc"])}
     try:
-        page = await graph("GET", page_id, fields="id,name,access_token", access_token=N.unseal(ch["user_token_enc"]))
-        if not page.get("access_token"):
-            raise GraphError("Facebook didn't give access to this Page. Make sure you are an admin of the Page.")
         await graph("POST", f"{page_id}/subscribed_apps", subscribed_fields="messages", access_token=page["access_token"])
     except GraphError as e:
         raise HTTPException(400, str(e))
