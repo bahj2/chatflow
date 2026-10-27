@@ -42,6 +42,6 @@ export const AuthShell = ({ eyebrow, title, children }) => (
   </div>
 );
 
-export const authCard = "rise w-full max-w-sm rounded-3xl border border-border bg-card p-8 card-shadow";
+export const authCard = "rise w-full max-w-[400px] rounded-3xl border border-border bg-card p-7 sm:p-9 shadow-[0_24px_60px_-28px_rgba(30,27,75,0.35)]";
 export const googleBtn = "w-full rounded-full bg-white text-slate-900 py-3 font-semibold border border-border shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center gap-2.5";
 export const Divider = () => <div className="flex items-center gap-3 my-5 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>;

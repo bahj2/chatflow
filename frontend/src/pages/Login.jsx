@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Navigate, Link, useLocation } from "react-router-dom";
 import { AuthShell, authCard, googleBtn, Divider } from "@/components/AuthShell";
 import { useAuth, errMsg } from "@/lib/auth";
-import { Input } from "@/components/ui/input";
+import { Mail, ArrowRight, Loader2 } from "lucide-react";
+import { IconInput, PasswordInput, SecureNote } from "@/components/AuthFields";
 import { FacebookLoginButton } from "@/components/FacebookLoginButton";
 
 export const GoogleIcon = () => (
@@ -45,15 +46,15 @@ export default function Login() {
   return (
     <AuthShell eyebrow="Welcome back" title="Your AI seller is already answering. Jump back in.">
       <form onSubmit={submit} className={authCard} data-testid="login-form">
-        <h1 className="font-display text-2xl font-bold">Sign in</h1>
-        <p className="text-sm text-muted-foreground mt-1 mb-6">Access your inbox and AI settings.</p>
-        <div className="space-y-3">
-          <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email-input" required className="h-11" />
-          <Input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="login-password-input" required className="h-11" />
+        <h1 className="font-display text-2xl font-bold tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted-foreground mt-1 mb-6">Sign in to your inbox and AI settings.</p>
+        <div className="space-y-4">
+          <IconInput label="Email" Icon={Mail} type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email-input" required autoComplete="email" />
+          <PasswordInput testid="login-password-input" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
         </div>
         {error && <p className="text-sm text-red-600 dark:text-red-400 mt-3" data-testid="login-error">{error}</p>}
-        <button disabled={busy} data-testid="login-submit-btn" className="mt-6 w-full rounded-full btn-brand py-3 font-semibold disabled:opacity-60">
-          {busy ? "Signing in…" : "Sign in"}
+        <button disabled={busy} data-testid="login-submit-btn" className="mt-6 w-full rounded-full btn-brand py-3 font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2">
+          {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</> : <>Sign in <ArrowRight className="h-4 w-4" /></>}
         </button>
         <Divider />
         <div className="space-y-3">
@@ -62,7 +63,8 @@ export default function Login() {
             <GoogleIcon /> Continue with Google
           </button>
         </div>
-        <p className="text-sm text-muted-foreground text-center mt-6">New here? <Link to="/signup" className="text-primary hover:underline underline-offset-4 font-semibold" data-testid="go-signup-link">Create a business account</Link></p>
+        <p className="text-sm text-muted-foreground text-center mt-6">New here? <Link to="/signup" className="text-primary hover:underline underline-offset-4 font-semibold" data-testid="go-signup-link">Start your 14-day free trial</Link></p>
+        <SecureNote />
       </form>
     </AuthShell>
   );

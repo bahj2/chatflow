@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 import jwt
 from fastapi import APIRouter, HTTPException, Request, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core import db, JWT_SECRET, JWT_ALG, EMAIL_RE, Settings, now_iso, hash_pw, verify_pw, current_user, client_ip, rate_ok, member_problem
 
@@ -50,8 +50,15 @@ async def create_business(name: str, owner_id: str) -> str:
 
 class RegisterIn(BaseModel):
     email: str
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
     business_name: str = Field(min_length=1, max_length=80)
+
+    @field_validator("password")
+    @classmethod
+    def strong_enough(cls, v: str) -> str:
+        if not (re.search(r"[A-Za-z]", v) and re.search(r"\d", v)):
+            raise ValueError("Password needs at least one letter and one number")
+        return v
 
 
 @router.post("/auth/register")

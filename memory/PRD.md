@@ -272,3 +272,8 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Video: /app/frontend/public/videos/replyflow-tour.mp4 (2:02, 1280x720, Khmer voice gpt-4o-mini-tts "shimmer", soft style, Khmer captions burned in through the browser overlay) + poster jpg. Rebuild: /app/video_build (scenes.json → tts.py → seed.py → record.py → mux.py). Demo shop tour@replyflow.com. The Playwright ffmpeg was swapped for the imageio-ffmpeg binary at /pw-browsers/ffmpeg-1013.
 - Note: the HF VoxCPM2 demo (Khmer voice replies) returned 503 during this session.
 - Tested in iteration_30 (100%).
+
+## Iteration 35 (2026-10) — Professional sign-up / login
+- New components/AuthFields.jsx: inputs with labels and icons, show/hide password, strength meter (Too weak/Weak/Good/Strong with a checklist), trial badge, secure note.
+- Sign-up now needs 8+ characters with a letter and a number (checked in the browser and in RegisterIn.field_validator in routers/auth.py). Existing logins are not affected.
+- Signup button reads "Start free trial", with a Terms/Privacy note. Login says "Welcome back".
