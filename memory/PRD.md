@@ -173,3 +173,13 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - P1: Rate limiter is in-memory (single process); move to Mongo/Redis if scaling
 - P1: Plan expiry reminders to shop owners; Khmer UI for Billing
 - P2: Instagram/WhatsApp, analytics, team members
+
+## Iteration 22 (2026-10) — Code check + "fix all until it works"
+- Workspace was a fresh import: backend/.env + frontend/.env were missing, DB empty, node_modules broken. Recreated .env (local Mongo, DB_NAME=replyflow, Emergent LLM key, new JWT_SECRET / NOTION_ENC_KEY / WEBHOOK_CRON_SECRET, admin admin@replyflow.com / admin123); preview URL for REACT_APP_BACKEND_URL
+- requirements.txt: litellm line had a #sha256 suffix that conflicted with emergentintegrations' pin → removed suffix (pip install works again)
+- New JWT_SECRET → old Telegram webhook secrets no longer match: each shop must press "Save & connect" in Channels again
+- Team security: sessions carry token_version ("tv"); members are signed out (401) when removed from Team access or when the plan no longer includes their seat (sorted allowed_emails order); owner-only: payment fields, channel tokens, team list, seller voice clone + transcript, Notion connect/disconnect, Telegram connect, billing checkout; members get secret fields blanked in GET /settings
+- Google sign-in on a password account created without email proof (email_verified False) turns that password off + ends older sessions (password_off toast)
+- Rate limiter moved to MongoDB (rate_hits, TTL); sign-up limit counted only after the duplicate-email check
+- Frontend: 401 interceptor signs out only the rejected session and shows the reason on /login; owner-only notes for members (Settings, Channels, Billing)
+- Tests: iteration_22 + iteration_23 pass; backend/tests/test_iter22_team_security.py, test_iter23_member_fixes.py; tests/check_team_security.py, tests/check_google_verify.py (Google reply stubbed)

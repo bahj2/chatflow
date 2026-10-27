@@ -27,10 +27,15 @@ export const AuthProvider = ({ children }) => {
     // Session ended on the server (teammate removed, plan ended, signed out elsewhere): go back to sign-in with the reason
     const id = api.interceptors.response.use((r) => r, (e) => {
       const url = e?.config?.url || "";
-      if (e?.response?.status === 401 && !/^\/auth\/(login|register|google)/.test(url) && localStorage.getItem("rf_token")) {
-        localStorage.removeItem("rf_token");
-        sessionStorage.setItem("rf_notice", errMsg(e));
-        setUser(false);
+      if (e?.response?.status === 401 && !/^\/auth\/(login|register|google)/.test(url) && e?.config?.headers?.Authorization) {
+        // parallel requests may 401 after the token was already cleared: swallow them too (only the first one sets the notice)
+        // only the session that was actually rejected is signed out (a late reply from an older session can't end a new one)
+        const sent = String(e.config.headers.Authorization).replace(/^Bearer /, "");
+        if (localStorage.getItem("rf_token") && localStorage.getItem("rf_token") === sent) {
+          localStorage.removeItem("rf_token");
+          sessionStorage.setItem("rf_notice", errMsg(e));
+          setUser(false);
+        }
         return new Promise(() => {}); // leaving the dashboard: let pending screens wait quietly instead of erroring
       }
       return Promise.reject(e);

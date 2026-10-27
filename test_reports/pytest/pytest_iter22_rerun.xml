@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="14" time="13.314" timestamp="2026-10-27T03:24:57.248003+00:00" hostname="agent-env-3a020fcf-392e-41c9-86cb-640b6d17c9ac"><testcase classname="tests.test_iter22_team_security" name="test_health_public_plans" time="0.163" /><testcase classname="tests.test_iter22_team_security" name="test_admin_businesses" time="0.475" /><testcase classname="tests.test_iter22_team_security" name="test_register_and_settings_save" time="0.792" /><testcase classname="tests.test_iter22_team_security" name="test_ai_test" time="1.057" /><testcase classname="tests.test_iter22_team_security" name="test_team_add_blocked_on_trial" time="0.278" /><testcase classname="tests.test_iter22_team_security" name="test_admin_set_pro" time="0.280" /><testcase classname="tests.test_iter22_team_security" name="test_member_get_settings_secrets_blank" time="0.953" /><testcase classname="tests.test_iter22_team_security" name="test_member_put_cannot_change_owner_fields" time="0.452" /><testcase classname="tests.test_iter22_team_security" name="test_member_owner_only_endpoints_403" time="0.427" /><testcase classname="tests.test_iter22_team_security" name="test_member_can_use_inbox_products_orders" time="0.834" /><testcase classname="tests.test_iter22_team_security" name="test_member_removed_then_blocked" time="1.483" /><testcase classname="tests.test_iter22_team_security" name="test_member_blocked_after_downgrade" time="1.005" /><testcase classname="tests.test_iter22_team_security" name="test_token_version_invalidation" time="0.961" /><testcase classname="tests.test_iter22_team_security" name="test_signup_rate_limit_429" time="4.018"><failure message="AssertionError: [200, 200, 200, 200, 200, 200, ...]&#10;assert 200 == 429">def test_signup_rate_limit_429():
+        DB.rate_hits.delete_many({})
+        created, codes = [], []
+        try:
+            for i in range(11):
+                r = requests.post(f"{API}/auth/register", json={"email": f"test_rl{i}_{STAMP}@example.com", "password": "secret123", "business_name": f"TEST_RL{i}"})
+                codes.append(r.status_code)
+                if r.status_code == 200:
+                    created.append(r.json()["user"]["business_id"])
+            assert codes[:10] == [200] * 10, codes
+&gt;           assert codes[10] == 429, codes
+E           AssertionError: [200, 200, 200, 200, 200, 200, ...]
+E           assert 200 == 429
+
+tests/test_iter22_team_security.py:193: AssertionError</failure></testcase></testsuite></testsuites>
