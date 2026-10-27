@@ -86,8 +86,17 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     body.bakong_account_id, body.khqr_token = body.bakong_account_id.strip(), body.khqr_token.strip()
     if body.bakong_account_id and not P.ACCOUNT_RE.match(body.bakong_account_id):
         raise HTTPException(400, "Bakong account ID looks wrong. Example: name@aclb")
-    if body.khqr_token and not body.khqr_token.startswith(P.RELAY_PREFIX):
-        raise HTTPException(400, "KHQR.dev token must start with rbk")
+    founder = user.get("role") == "superadmin"
+    if body.khqr_token.startswith(P.JWT_PREFIX) and founder and body.khqr_token != cur.khqr_token:
+        # founder may use a Bakong Open API token (from api-bakong.nbc.gov.kh): check it with Bakong right now
+        exp = P.jwt_expiry(body.khqr_token)
+        if not P.jwt_valid(body.khqr_token):
+            raise HTTPException(400, f"This Bakong token expired{(' on ' + exp) if exp else ''}. Renew it at api-bakong.nbc.gov.kh and paste the new one.")
+        ok, why = await P.token_ok(body.khqr_token)
+        if not ok:
+            raise HTTPException(400, f"Bakong didn't accept this token: {why}")
+    elif body.khqr_token and not body.khqr_token.startswith(P.RELAY_PREFIX) and not (founder and body.khqr_token.startswith(P.JWT_PREFIX)):
+        raise HTTPException(400, "KHQR.dev token must start with rbk" + (" (or a Bakong token starting with eyJ)" if founder else ""))
     await db.settings.update_one({"business_id": bid}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": bid}, {"$set": {"name": body.business_name}})
     return for_user(body, user)

@@ -31,6 +31,15 @@ def jwt_valid(token: str) -> bool:
     return exp > time.time() + 60
 
 
+def jwt_expiry(token: str) -> str:
+    import base64, json  # noqa: E401
+    try:
+        exp = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "==")).get("exp", 0)
+        return time.strftime("%d %b %Y", time.gmtime(exp)) if exp else ""
+    except (ValueError, IndexError):
+        return ""
+
+
 def can_check(token: str) -> bool:
     """Payments can be confirmed automatically: KHQR.dev relay token, or a valid Bakong Open API token."""
     t = (token or "").strip()
@@ -110,7 +119,38 @@ def _deeplink(token: str, qr: str, app_name: str):
         return None
 
 
+BAKONG_API = "https://api-bakong.nbc.gov.kh/v1"
+
+
+def _bakong(path: str, token: str, payload) -> dict:
+    """Direct Bakong Open API call (the library reports a rejected token as 'UNPAID', which would hide the problem)."""
+    import httpx
+    try:
+        r = httpx.post(f"{BAKONG_API}/{path}", json=payload, headers={"Authorization": f"Bearer {token}"}, timeout=20)
+    except httpx.HTTPError as e:
+        raise PaymentError(f"Bakong could not be reached ({e.__class__.__name__})")
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+        if r.status_code < 400:
+            raise PaymentError(f"Bakong sent an unexpected reply (status {r.status_code})")
+    if r.status_code in (401, 403) or data.get("errorCode") == 6:
+        raise PaymentError(data.get("responseMessage") or "Bakong rejected the token")
+    if r.status_code >= 400:
+        raise PaymentError(data.get("responseMessage") or f"Bakong error {r.status_code}")
+    return data
+
+
 def _bulk_paid(token: str, md5s: list) -> list:
+    if token.startswith(JWT_PREFIX):
+        # one at a time: Bakong's bulk endpoint refuses servers outside Cambodia, the single check answers
+        paid = []
+        for m in md5s[:50]:
+            d = _bakong("check_transaction_by_md5", token, {"md5": m})
+            if d.get("responseCode") == 0 and d.get("data"):
+                paid.append(m)
+        return paid
     try:
         return KHQR(token).check_bulk_payments(md5s[:50])
     except ValueError as e:
@@ -119,9 +159,12 @@ def _bulk_paid(token: str, md5s: list) -> list:
 
 def _token_ok(token: str) -> tuple:
     try:
-        KHQR(token).check_payment("0" * 32)
+        if token.startswith(JWT_PREFIX):
+            _bakong("check_transaction_by_md5", token, {"md5": "0" * 32})  # "not found" = token works
+        else:
+            KHQR(token).check_payment("0" * 32)
         return True, ""
-    except ValueError as e:
+    except (ValueError, PaymentError) as e:
         return False, str(e)
 
 

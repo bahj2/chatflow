@@ -114,7 +114,7 @@ async def poll_relay(late: bool):
     async def check(bid, orders):
         async with sem:
             token = (await get_settings(bid)).khqr_token
-            if not token.startswith(P.RELAY_PREFIX):
+            if not P.can_check(token):
                 return
             for i in range(0, len(orders), 50):
                 chunk = orders[i:i + 50]

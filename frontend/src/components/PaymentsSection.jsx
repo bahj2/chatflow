@@ -1,18 +1,24 @@
 import { useState } from "react";
 import { QrCode, Loader2, CheckCircle2, Zap, Hand, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { api, errMsg } from "@/lib/auth";
+import { api, errMsg, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { mediaUrl } from "@/components/Attachments";
 
 const KHQR_DEV = "https://dash.khqr.dev";
 
+// Bakong Open API token (founder only): "automatic" while it hasn't expired
+const jwtLeft = (t) => {
+  try { return JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).exp * 1000 - Date.now(); } catch { return -1; }
+};
+
 const ModeBadge = ({ s }) => {
-  const auto = (s.khqr_token || "").startsWith("rbk");
+  const t = s.khqr_token || "";
+  const auto = t.startsWith("rbk") || (t.startsWith("eyJ") && jwtLeft(t) > 0);
   const on = auto || /^[A-Za-z0-9._-]{2,40}@[A-Za-z0-9._-]{2,20}$/.test(s.bakong_account_id || "");
   if (!on) return <span className="text-xs text-muted-foreground/80" data-testid="payments-mode">Off — add your Bakong account ID to turn on KHQR payments</span>;
   return auto
-    ? <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400" data-testid="payments-mode"><Zap className="h-3.5 w-3.5" /> Automatic — payments are confirmed by themselves (KHQR.dev)</span>
+    ? <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400" data-testid="payments-mode"><Zap className="h-3.5 w-3.5" /> Automatic — payments are confirmed by themselves ({t.startsWith("eyJ") ? `Bakong token, ${Math.max(0, Math.floor(jwtLeft(t) / 86400000))} days left` : "KHQR.dev"})</span>
     : <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300" data-testid="payments-mode"><Hand className="h-3.5 w-3.5" /> Manual — tap “Mark paid” in Inbox or Orders after checking your bank app</span>;
 };
 
@@ -41,6 +47,10 @@ const Preview = () => {
 
 export const PaymentsSection = ({ s, setS, Section, Field }) => {
   const set = (k) => (e) => setS((x) => ({ ...x, [k]: e.target.value }));
+  const { user } = useAuth();
+  const founder = user?.role === "superadmin";
+  const t = s.khqr_token || "";
+  const expired = t.startsWith("eyJ") && jwtLeft(t) <= 0;
   return (
     <Section title="Bakong KHQR payments" desc="When a customer confirms an order, the AI sends a KHQR with the exact total. Customers pay with any Cambodian bank app.">
       <div data-testid="payments-section" className="space-y-4">
@@ -57,9 +67,13 @@ export const PaymentsSection = ({ s, setS, Section, Field }) => {
               Bakong’s own payment check only works from servers inside Cambodia. Create a free store at KHQR.dev with the same Bakong account, then paste its token (starts with rbk) here.
               ReplyFlow then sees each payment within seconds, marks the order Paid and thanks the customer.
             </p>
+            {founder && <p className="text-xs text-muted-foreground mt-2 leading-relaxed" data-testid="founder-token-note">
+              <b>Founder:</b> you can also paste your <b>Bakong token</b> (starts with eyJ, from api-bakong.nbc.gov.kh → Renew token). It confirms shops’ plan payments to your account automatically. It lasts 90 days — we check it with Bakong when you save.
+            </p>}
+            {expired && <p className="text-xs font-medium text-red-600 dark:text-red-400 mt-2" data-testid="token-expired">This Bakong token has expired — renew it at api-bakong.nbc.gov.kh and paste the new one.</p>}
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Input type="password" autoComplete="off" value={s.khqr_token || ""} onChange={set("khqr_token")} placeholder="rbk_…" data-testid="khqr-token-input" />
+            <Input type="password" autoComplete="off" value={s.khqr_token || ""} onChange={set("khqr_token")} placeholder={founder ? "rbk_… or eyJ…" : "rbk_…"} data-testid="khqr-token-input" />
             <a href={KHQR_DEV} target="_blank" rel="noreferrer" data-testid="khqr-dev-link"
               className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted/60">
               <ExternalLink className="h-3.5 w-3.5" /> Get a token

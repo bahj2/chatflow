@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorClient  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import billing as B  # noqa: E402
+import payments as P  # noqa: E402
 
 
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
@@ -158,7 +159,8 @@ async def platform_settings():
         return None
     s = await get_settings(admin["business_id"])
     env_token = (os.environ.get("BAKONG_TOKEN") or "").strip()  # founder's Bakong Open API token (kept as a secret, not in the DB)
-    if env_token and not (s.khqr_token or "").strip().startswith("rbk"):
+    saved = (s.khqr_token or "").strip()
+    if env_token and not P.can_check(saved):
         s = s.model_copy(update={"khqr_token": env_token})
     return s
 
