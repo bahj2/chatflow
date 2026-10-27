@@ -50,7 +50,10 @@ export default function Login() {
         <p className="text-sm text-muted-foreground mt-1 mb-6">Sign in to your inbox and AI settings.</p>
         <div className="space-y-4">
           <IconInput label="Email" Icon={Mail} type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email-input" required autoComplete="email" />
-          <PasswordInput testid="login-password-input" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+          <div>
+            <PasswordInput testid="login-password-input" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+            <div className="mt-2 text-right"><Link to="/forgot-password" className="text-xs font-semibold text-primary hover:underline underline-offset-4" data-testid="login-forgot-link">Forgot password?</Link></div>
+          </div>
         </div>
         {error && <p className="text-sm text-red-600 dark:text-red-400 mt-3" data-testid="login-error">{error}</p>}
         <button disabled={busy} data-testid="login-submit-btn" className="mt-6 w-full rounded-full btn-brand py-3 font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-2">

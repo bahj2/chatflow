@@ -48,6 +48,12 @@ async def create_business(name: str, owner_id: str) -> str:
     return bid
 
 
+def check_strong(v: str) -> str:
+    if not (re.search(r"[A-Za-z]", v) and re.search(r"\d", v)):
+        raise ValueError("Password needs at least one letter and one number")
+    return v
+
+
 class RegisterIn(BaseModel):
     email: str
     password: str = Field(min_length=8, max_length=128)
@@ -56,9 +62,7 @@ class RegisterIn(BaseModel):
     @field_validator("password")
     @classmethod
     def strong_enough(cls, v: str) -> str:
-        if not (re.search(r"[A-Za-z]", v) and re.search(r"\d", v)):
-            raise ValueError("Password needs at least one letter and one number")
-        return v
+        return check_strong(v)
 
 
 @router.post("/auth/register")

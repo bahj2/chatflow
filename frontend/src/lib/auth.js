@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("rf_token");
     setUser(false);
   };
-  return <AuthCtx.Provider value={{ user, setUser, login, register, loginGoogle, loginFacebook, failGoogle, logout }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, setUser, setSession: save, login, register, loginGoogle, loginFacebook, failGoogle, logout }}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

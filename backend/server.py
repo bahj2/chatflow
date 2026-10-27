@@ -9,10 +9,10 @@ from starlette.middleware.cors import CORSMiddleware
 from core import client, db, logger, now_iso, hash_pw, verify_pw, Settings
 import media as M
 from orders import payments_loop
-from routers import admin, auth, channels, inbox, meta, notion, settings, shop, subscriptions, voice, webhooks
+from routers import admin, auth, channels, inbox, meta, notion, password_reset, settings, shop, subscriptions, voice, webhooks
 
 app = FastAPI()
-for r in (auth, admin, settings, webhooks, inbox, shop, voice, notion, channels, subscriptions, meta):
+for r in (auth, password_reset, admin, settings, webhooks, inbox, shop, voice, notion, channels, subscriptions, meta):
     app.include_router(r.router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
                    allow_methods=["*"], allow_headers=["*"])
@@ -22,6 +22,8 @@ app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.envi
 async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.password_resets.create_index("email")
+    await db.password_resets.create_index("exp", expireAfterSeconds=0)
     await db.rate_hits.create_index([("k", 1), ("t", -1)])
     await db.rate_hits.create_index("exp", expireAfterSeconds=0)
     await db.oauth_states.create_index("state", unique=True)
