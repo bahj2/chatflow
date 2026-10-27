@@ -265,3 +265,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Switch "on" is now emerald so it's visible in dark mode.
 - Tested in iteration_29 (100%); the LOW issues it found are fixed.
 - Backlog: product variants (sizes/colors), SKU, hide product from AI, low-stock alert, CSV import/export, personality presets, shop hours.
+
+## Iteration 34 (2026-10) — Free trial + Khmer tutorial video
+- Trial: 14 days, 200 replies, Pro features (Notion, 3 logins), voice-to-voice off. PLANS[*]["voice"]; view() returns voice; effective() uses voice; require_voice in core.py is used by routers/voice.py.
+- Landing: hero "Start 14-day free trial", #video section, #pricing with trial card + 3 plans (components/LandingPricing.jsx). Dashboard: sidebar play button opens the tutorial video.
+- Video: /app/frontend/public/videos/replyflow-tour.mp4 (2:02, 1280x720, Khmer voice gpt-4o-mini-tts "shimmer", soft style, Khmer captions burned in through the browser overlay) + poster jpg. Rebuild: /app/video_build (scenes.json → tts.py → seed.py → record.py → mux.py). Demo shop tour@replyflow.com. The Playwright ffmpeg was swapped for the imageio-ffmpeg binary at /pw-browsers/ffmpeg-1013.
+- Note: the HF VoxCPM2 demo (Khmer voice replies) returned 503 during this session.
+- Tested in iteration_30 (100%).

@@ -1,0 +1,28 @@
+{
+  "summary": "Tested the free trial (14 days, 200 replies, Pro features except voice-to-voice) and the Khmer tour video, on the backend and frontend. Backend: 9/9 new tests pass (tests/test_iter30_free_trial.py). A new shop's GET /api/billing gives plan=trial, pro=true, voice=false, team=3, limit=200, days_left=14. Notion connect/sync are no longer blocked for trial shops (400 'Connect Notion first' or bad token, not 402). POST /api/voice/test and POST /api/settings/seller-voice return 402 with the 'paid Pro and Business plans' message. Unit test: effective() turns off voice_replies and seller_voice for trial and Starter and keeps them for Pro. An expired trial gives pro=false, voice=false, team=1. Video file checked with ffmpeg: H.264 High 1280x720 + AAC mono, 2:01.96 long, real audio (mean -18 dB), moov at the front (faststart). Served as video/mp4 with 206 range support. Frontend: all landing testids are present. Hero and trial buttons go to /signup. The #video section shows the poster with Khmer captions. The pricing section shows the trial card and the Starter/Pro/Business cards. Signup via the UI leads to the dashboard. nav-tutorial-btn opens tutorial-dialog with the video, and Escape closes it. Billing page shows 'Free trial · 14 days left · 0/200'. AI & voice tab shows pro-lock-voice with the 'paid Pro and Business plans' text. Knowledge tab shows the Notion connect form, not pro-lock-notion. Team tab shows no pro-lock-team. At 390px: no horizontal overflow (scrollWidth 390).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Landing mobile nav (390px)", "issues": ["The Video and Pricing nav links are hidden on mobile and there is no mobile menu. The hero 'Watch the video' button partly makes up for this. Low priority."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter30_free_trial.py", "/app/test_reports/pytest/pytest_iter30.xml"],
+  "action_items": [
+    "Update the stale old tests that now fail because the trial is Pro (expected): test_iter21_billing_refactor.py::TestProGating::test_trial_gated, ::TestRegression::test_team_limit_402_trial and test_iter22_team_security.py::test_team_add_blocked_on_trial (trial team is now 3).",
+    "Optional: add a mobile menu or anchor links for Video/Pricing on small screens."
+  ],
+  "critical_code_review_comments": [
+    "billing.view/effective/require_voice are correct. replies.py applies effective() before s.voice_replies is used, so trial shops never get TTS voice replies.",
+    "Existing shops still on an active trial now get Pro features right away (intended).",
+    "test_iter28_fb_lock_billing.py breaks at collection if the REACT_APP_BACKEND_URL env var is not exported (os.environ.get(...).rstrip). The new iter30 test falls back to reading frontend/.env.",
+    "Running test_iter21 TestBilling::test_checkout_flow calls KHQR checkout (mode is now 'relay', the test expects 'local'). It was run once by accident in a regression sweep. Exclude it from future runs."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter30_free_trial.py"],
+  "success_rate": {"backend": "100% (9/9 new tests)", "frontend": "100%"},
+  "seed_data_creation": "Temporary TEST_ shops were created via register/signup and then deleted, along with leftover test_* users from earlier iterations. tour@ and admin@ were not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Playwright's bundled Chromium has no H.264 support, so <video> reports error code 4 there. This is a limitation of the test environment, not an app bug. Check the video with the imageio_ffmpeg binary instead (python -c 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())'). Run pytest with REACT_APP_BACKEND_URL exported."
+}
