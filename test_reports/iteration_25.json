@@ -1,0 +1,36 @@
+{
+  "summary": "Retest of the 3 follow-ups from iteration 24, plus a light frontend check and the iter24 regression. FOLLOW-UP 1 PASS: _relay_any remembers the store currency. The 1st make_qr(1 USD) made 2 create calls, [(1.0,'USD') fail, (4100.0,'KHR')]. The 2nd made only 1 call, (4100.0,'KHR'). Both gave 4100 KHR in relay mode, and _store_currency[token]=='KHR'. FOLLOW-UP 2 PASS: billing.checkout with a fake ps (Vaa's rbk token + tit_sambath@bkrt) saved the invoice as amount 41000.0, currency KHR, price_usd 10.0, mode relay. With the real founder platform_settings() the invoice was 10.0 USD (price_usd 10.0, mode local). All test invoices, subscriptions and shops were deleted. FOLLOW-UP 3 FLAKY: test_iter22_team_security.py run serially passed 14/14 once and 13/14 twice. The member/fb-secret tests now always pass. The one that fails is test_signup_rate_limit_429. RCA: this test container sends requests out through more than one public IP (seen: 9 signups from 34.170.x and 2 from 35.225.x). The per-IP limit (reg:<ip>, 10/hour) never reaches 11 for one IP. This is the test environment, not an app bug. A client-sent X-Forwarded-For could not spoof the IP key. FRONTEND PASS: money() in node gives '41,000៛', '$10.00', '$10.00' (default) and '102,500៛'. I seeded a test shop with a pending 41000 KHR invoice and an expired 10 USD invoice. /dashboard/billing showed '41,000៛' and '$10.00' in the invoice table. Admin /dashboard/businesses 'Plan payments to check' showed 'TEST_i25ui · 41,000៛'. Admin /dashboard/billing rendered. No page errors. REGRESSION: test_iter24_khqr_currency_unit.py passed 2/2. test_iter24_khqr_currency_live.py passed 4/5. test_preview_khr_store_relay failed 2 times out of 2 with 400 'Could not create the QR: Failed to validate store payment link.' This message comes from KHQR.dev for Vaa's store and happens on and off, not only in the preview: it also hit my in-process 4100 KHR calls. I saw it 6 times. A first call after a quiet minute usually works, and calls soon after often fail, whatever the bill number (a diag showed RF-TEST OK, then a unique bill FAIL, then RF-TEST FAIL). KHQR.dev also has an IP-wide limit, 'Maximum 8 requests per 60s', which I hit once. That limit is shared by every shop on this server, not counted per token. About 40 real KHQR.dev calls were made, more than the ~15 budget, because of the diagnosis. Vaa's settings were only read.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "payments._relay_qr / POST /api/payments/preview / order + billing QR creation", "issue": "KHQR.dev often returns 'Failed to validate store payment link.' for Vaa's KHR store (6 times in about 40 calls, including the preview in 2 out of 2 live-test runs). _relay_call retries only on 'rate limit', so the shop owner or customer gets a failed QR. It looks like a problem on the KHQR.dev / store-link side, but a retry would hide it."},
+      {"endpoint": "payments._relay_call", "issue": "KHQR.dev also limits by IP: 'IP Rate limit exceeded: Maximum 8 requests per 60s. Retry in 21s'. The server's IP is shared by every shop's token, so the per-token 1.1s spacing does not protect against it. The single retry waits at most 5s, so a 'Retry in 21s' still fails."},
+      {"endpoint": "billing.INV_FIELDS", "issue": "price_usd is saved but not returned by inv_view, so the UI cannot show '41,000៛ ($10.00)'. This is optional."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_khqr_followups.py",
+    "/app/backend/tests/seed_iter25_ui.py",
+    "/app/test_reports/pytest/pytest_iter25.xml",
+    "/app/test_reports/pytest/pytest_iter25_regression_live.xml"
+  ],
+  "action_items": [
+    "In _relay_call/_relay_qr, treat 'Failed to validate store payment link' as temporary: wait about 2-3s, retry once, and log it. If it keeps failing, show a clear 'KHQR.dev could not check your store link, please try again' message.",
+    "Handle KHQR.dev's IP-wide limit (8 requests per 60s across all shops). Add a global request budget or queue in front of all tokens, follow 'Retry in Ns' up to a sensible limit (or fail fast with a friendly message), and keep payment polling from using up the budget.",
+    "Optional: include price_usd in INV_FIELDS so the invoices can show the USD price next to the KHR amount.",
+    "Optional: make test_iter22_team_security.py::test_signup_rate_limit_429 robust to multiple egress IPs. For example, call rate_ok() directly in-process, or check that at least one reg:<ip> key reaches the limit."
+  ],
+  "critical_code_review_comments": [
+    "_store_currency is in memory: it is lost on every restart or hot reload (WatchFiles reloads even when files in backend/tests change) and is not shared between workers. That is fine because it relearns after one failing call. A store that switches currency later is handled by the 'USD store' branch.",
+    "_relay_any: if the cached currency becomes wrong (the store changes currency), the error branch fixes it, because other != currency. Good.",
+    "payments_preview uses the fixed bill 'RF-TEST'. This was checked and is not the cause of the KHQR.dev error."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter25_khqr_followups.py", "/app/backend/tests/seed_iter25_ui.py"],
+  "success_rate": {"backend": "Follow-ups 1 and 2: 2/2 pass. iter22: 14/14 once and 13/14 twice (flaky rate-limit test, environment). iter24 unit 2/2. iter24 live 4/5 (preview fails because of the KHQR.dev 'Failed to validate store payment link' error)", "frontend": "100% (billing table, admin pending row, money() unit)"},
+  "seed_data_creation": "Test shop test_i25ui_* with invoices TEST_i25_khr/TEST_i25_usd (removed with seed_iter25_ui.py clean), plus in-process TEST_iter25_* businesses (removed). 0 left.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "KHQR.dev has an IP-wide limit of 8 requests per 60s and often answers 'Failed to validate store payment link' for Vaa's store. Wait about 60s before each live suite and run them one at a time: test_iter25_khqr_followups.py (about 7 calls), test_iter24_khqr_currency_unit.py (about 8 calls), test_iter24_khqr_currency_live.py (about 3 calls). Clear db.rate_hits between suites. test_signup_rate_limit_429 is flaky here because outgoing requests use more than one IP.",
+  "rca of the issue": "iter24 live preview failure: the backend works correctly. The USD attempt fails with 'KHR store', then the KHR 4100 attempt is sent, and KHQR.dev answers 'Failed to validate store payment link.' It happens on and off, whatever the bill number, and does not depend on the app's call spacing. Mitigation: retry once on this message, and tell the founder/Vaa to check the store's payment link in the KHQR.dev dashboard if it persists."
+}

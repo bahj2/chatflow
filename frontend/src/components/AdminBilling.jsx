@@ -58,7 +58,7 @@ export const SetPlanDialog = ({ b, onClose, onDone }) => {
 const InvoiceRow = ({ i, armed, onConfirm }) => (
   <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3" data-testid={`admin-invoice-${i.id}`}>
     <div className="flex-1 min-w-[180px]">
-      <p className="text-sm font-semibold">{i.business_name || "Unknown shop"} · {money(i.amount, i.currency)}</p>
+      <p className="text-sm font-semibold">{i.business_name || "Unknown shop"} · {money(i.amount, i.currency, i.price_usd)}</p>
       <p className="text-xs text-muted-foreground">{i.item_name} · <span className="font-mono">{i.number}</span> · {when(i.created_at)}{i.status === "expired" ? " · QR expired" : ""}</p>
     </div>
     <button onClick={() => onConfirm(i)} data-testid={`admin-invoice-confirm-${i.id}`}

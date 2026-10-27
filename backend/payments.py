@@ -3,6 +3,7 @@ import asyncio
 import io
 import os
 import threading
+from collections import deque
 import re
 import time
 
@@ -100,26 +101,62 @@ def _local_qr(account_id: str, merchant: str, city: str, amount: float, currency
 
 
 # KHQR.dev allows 1 request per second per token: space every call for the same token, retry once if still limited
+# ...and 8 requests per 60 s per server IP for ALL shops together: one shared budget, a few slots kept for customer QRs
 _GAP = 1.1
+_WINDOW, _MAX, _KEEP = 60, 7, 3
 _locks: dict = {}
 _last: dict = {}
+_calls: deque = deque()
 _guard = threading.Lock()
+BUSY = "KHQR.dev is busy right now. Please try again in a minute."
 
 
-def _relay_call(token: str, fn):
+def _budget(wait_max: float, keep: int = 0) -> bool:
+    """Reserve one KHQR.dev call in the shared per-IP window; wait up to wait_max seconds. keep = slots left for others."""
+    deadline = time.time() + wait_max
+    while True:
+        with _guard:
+            now = time.time()
+            while _calls and _calls[0] < now - _WINDOW:
+                _calls.popleft()
+            if len(_calls) < _MAX - keep:
+                _calls.append(now)
+                return True
+            wait = _calls[0] + _WINDOW - now if _calls else 1
+        if time.time() + wait > deadline:
+            return False
+        time.sleep(min(wait, 1.0))
+
+
+def _relay_call(token: str, fn, wait_max: float = 25, keep: int = 0):
+    """wait_max 0 + keep: background work that simply skips when the budget is tight (raises ValueError(BUSY))."""
     with _guard:
         lock = _locks.setdefault(token, threading.Lock())
     with lock:
+        start = time.time()
         for attempt in range(2):
             wait = _last.get(token, 0) + _GAP - time.time()
             if wait > 0:
                 time.sleep(wait)
+            if not _budget(max(0.0, wait_max - (time.time() - start)), keep):
+                raise ValueError(BUSY)
             try:
                 return fn(KHQR(token))
             except ValueError as e:
-                if attempt == 0 and "rate limit" in str(e).lower():
-                    m = re.search(r"retry in (\d+)", str(e), re.I)
-                    time.sleep(min(5, int(m.group(1)) if m else 2))
+                msg = str(e).lower()
+                left = wait_max - (time.time() - start)
+                if attempt == 0 and "rate limit" in msg:
+                    m = re.search(r"retry in (\d+)", msg)
+                    pause = int(m.group(1)) if m else 2
+                    if pause <= left:
+                        if "ip rate limit" in msg:  # the whole server is over: fill the window so others wait too
+                            with _guard:
+                                _calls.extend([time.time()] * max(0, _MAX - len(_calls)))
+                        time.sleep(pause)
+                        continue
+                    raise ValueError(BUSY)
+                if attempt == 0 and "validate store payment link" in msg and left > 3:
+                    time.sleep(2.5)  # KHQR.dev's store-link check fails now and then; a second try usually works
                     continue
                 raise
             finally:
@@ -172,7 +209,7 @@ def _png(qr: str) -> bytes:
 
 def _deeplink(token: str, qr: str, app_name: str):
     try:
-        return _relay_call(token, lambda k: k.generate_deeplink(qr, appName=app_name[:30] or "ReplyFlow"))
+        return _relay_call(token, lambda k: k.generate_deeplink(qr, appName=app_name[:30] or "ReplyFlow"), wait_max=0, keep=1)
     except Exception:
         return None
 
@@ -209,9 +246,11 @@ def _bulk_paid(token: str, md5s: list) -> list:
             if d.get("responseCode") == 0 and d.get("data"):
                 paid.append(m)
         return paid
-    try:
-        return _relay_call(token, lambda k: k.check_bulk_payments(md5s[:50]))
+    try:  # background check: only uses spare budget, never blocks customer QRs
+        return _relay_call(token, lambda k: k.check_bulk_payments(md5s[:50]), wait_max=0, keep=_KEEP)
     except ValueError as e:
+        if str(e) == BUSY:
+            return []  # try again on the next round
         raise PaymentError(str(e))
 
 
@@ -220,7 +259,7 @@ def _token_ok(token: str) -> tuple:
         if token.startswith(JWT_PREFIX):
             _bakong("check_transaction_by_md5", token, {"md5": "0" * 32})  # "not found" = token works
         else:
-            _relay_call(token, lambda k: k.check_payment("0" * 32))
+            _relay_call(token, lambda k: k.check_payment("0" * 32), wait_max=10)
         return True, ""
     except (ValueError, PaymentError) as e:
         return False, str(e)

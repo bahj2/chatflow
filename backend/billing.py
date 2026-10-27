@@ -122,7 +122,7 @@ async def record_stt(db, bid: str, seconds: float):
 
 
 # ---------- Invoices (KHQR to the platform owner's Bakong account) ----------
-INV_FIELDS = ("id", "number", "item", "item_name", "amount", "currency", "status", "mode", "deeplink", "created_at", "expires_at", "paid_at")
+INV_FIELDS = ("id", "number", "item", "item_name", "amount", "currency", "price_usd", "status", "mode", "deeplink", "created_at", "expires_at", "paid_at")
 
 
 def inv_view(i: dict) -> dict:

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="5" time="5.354" timestamp="2026-10-27T10:19:52.296629+00:00" hostname="agent-env-3a020fcf-392e-41c9-86cb-640b6d17c9ac"><testcase classname="tests.test_iter24_khqr_currency_live" name="test_preview_khr_store_relay" time="3.161"><failure message="AssertionError: {&quot;detail&quot;:&quot;Could not create the QR: Failed to validate store payment link.&quot;}&#10;assert 400 == 200&#10; +  where 400 = &lt;Response [400]&gt;.status_code">khr_shop = {'tok': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYzJmMWUwMy1kYzgxLTQ4ZjQtYjc4Mi0zMGFhNDMzZTYwYTciLCJlbWFpbCI6...OTIsInR5cGUiOiJhY2Nlc3MifQ.oFMo_zxKFsqwWQWkDbAa7zkYcTRy28K2kvYmpl56Fho', 'bid': '6ef18abb-45d6-4aef-af79-bc597e14f4c2'}
+
+    def test_preview_khr_store_relay(khr_shop):
+        r = requests.post(f"{API}/payments/preview", headers=H(khr_shop["tok"]), timeout=90)
+&gt;       assert r.status_code == 200, r.text
+E       AssertionError: {"detail":"Could not create the QR: Failed to validate store payment link."}
+E       assert 400 == 200
+E        +  where 400 = &lt;Response [400]&gt;.status_code
+
+tests/test_iter24_khqr_currency_live.py:70: AssertionError</failure></testcase><testcase classname="tests.test_iter24_khqr_currency_live" name="test_preview_local" time="1.053" /><testcase classname="tests.test_iter24_khqr_currency_live" name="test_shop_eyj_rejected" time="0.239" /><testcase classname="tests.test_iter24_khqr_currency_live" name="test_founder_expired_token" time="0.577" /><testcase classname="tests.test_iter24_khqr_currency_live" name="test_billing_checkout" time="0.204" /></testsuite></testsuites>
