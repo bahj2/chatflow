@@ -65,17 +65,22 @@ async def messenger_webhook(bid: str, request: Request, bg: BackgroundTasks):
     except json.JSONDecodeError:
         raise HTTPException(400, "Invalid JSON")
     for entry in data.get("entry", []):
-        for ev in entry.get("messaging", []):
-            msg = ev.get("message") or {}
-            if not msg or msg.get("is_echo"):
-                continue
-            psid = ev["sender"]["id"]
-            audio = next((a for a in msg.get("attachments", []) if a.get("type") == "audio"), None)
-            if msg.get("text"):
-                bg.add_task(handle_incoming, bid, "messenger", psid, f"Messenger user {psid[-4:]}", msg["text"])
-            elif audio and audio.get("payload", {}).get("url"):
-                bg.add_task(messenger_voice, bid, psid, audio["payload"]["url"])
+        dispatch_messenger(bid, entry, bg)
     return {"ok": True}
+
+
+def dispatch_messenger(bid: str, entry: dict, bg: BackgroundTasks):
+    """Queues the customer messages of one webhook entry (a Page) for the shop that owns that Page."""
+    for ev in entry.get("messaging", []):
+        msg = ev.get("message") or {}
+        if not msg or msg.get("is_echo"):
+            continue
+        psid = ev["sender"]["id"]
+        audio = next((a for a in msg.get("attachments", []) if a.get("type") == "audio"), None)
+        if msg.get("text"):
+            bg.add_task(handle_incoming, bid, "messenger", psid, f"Messenger user {psid[-4:]}", msg["text"])
+        elif audio and audio.get("payload", {}).get("url"):
+            bg.add_task(messenger_voice, bid, psid, audio["payload"]["url"])
 
 
 async def messenger_voice(bid, psid, url):

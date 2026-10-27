@@ -18,6 +18,8 @@ SECRET_FIELDS = ("telegram_token", "fb_page_token", "fb_app_secret", "fb_verify_
 
 def for_user(s: Settings, user: dict) -> dict:
     d = s.model_dump()
+    if s.fb_oauth:
+        d["fb_page_token"] = ""  # connected with Facebook login: the Page token never goes to the browser
     if not is_owner(user):
         d.update({k: "" for k in SECRET_FIELDS})
     return d
@@ -62,6 +64,11 @@ async def write_settings(body: Settings, user=Depends(current_user)):
     body.telegram_token, body.fb_page_token = body.telegram_token.strip(), body.fb_page_token.strip()
     if body.telegram_token and body.telegram_token != cur.telegram_token and await taken_by_other(bid, same_bot(body.telegram_token)):
         raise HTTPException(409, TG_TAKEN)
+    body.fb_oauth, body.fb_page_name = cur.fb_oauth, cur.fb_page_name  # only the Connect with Facebook flow changes these
+    if cur.fb_oauth:
+        body.fb_page_token = cur.fb_page_token
+    elif body.fb_page_token != cur.fb_page_token:
+        body.fb_page_name = ""
     body.fb_page_id = cur.fb_page_id
     if body.fb_page_token and (body.fb_page_token != cur.fb_page_token or not cur.fb_page_id):
         body.fb_page_id = await fb_page_id(body.fb_page_token)

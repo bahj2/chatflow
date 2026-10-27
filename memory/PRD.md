@@ -183,3 +183,14 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Rate limiter moved to MongoDB (rate_hits, TTL); sign-up limit counted only after the duplicate-email check
 - Frontend: 401 interceptor signs out only the rejected session and shows the reason on /login; owner-only notes for members (Settings, Channels, Billing)
 - Tests: iteration_22 + iteration_23 pass; backend/tests/test_iter22_team_security.py, test_iter23_member_fixes.py; tests/check_team_security.py, tests/check_google_verify.py (Google reply stubbed)
+
+## Iteration 23 (2026-10) — One-click "Connect with Facebook"
+- User: "how make it easy" → chose one-click button; no Meta app yet (guide given in-app)
+- Platform-owned Meta app (env: META_APP_ID, META_APP_SECRET, optional META_LOGIN_CONFIG_ID, META_WEBHOOK_VERIFY_TOKEN [generated]); Graph v26.0; button shows only when ID + secret + verify token are set
+- backend/routers/meta.py: POST /api/meta/facebook/start (owner) → Facebook login URL (state in db.oauth_states, 10-min TTL); GET /api/meta/facebook/callback → code → long-lived user token → /me/accounts → db.fb_choices (token sealed with Fernet, 1-h TTL) → /dashboard/channels?fb=pick (or ?fb_error=); GET /api/meta/facebook/pages (taken flag); POST /api/meta/facebook/pages/{id}/connect → page token + POST /{page}/subscribed_apps (messages) → settings fb_page_token/fb_page_id/fb_page_name/fb_oauth=True; DELETE /api/meta/facebook (unsubscribe + clear); GET /api/meta/status
+- One app-level webhook GET/POST /api/webhooks/meta/page (platform verify token, X-Hub-Signature-256 with platform app secret), routed by entry.id → shop with fb_oauth; shared dispatch_messenger() with the per-shop manual webhook (unchanged)
+- Page token never sent to the browser in oauth mode; PUT /settings keeps oauth connection fields
+- GET /api/admin/meta-setup (superadmin): redirect URI, webhook URL, verify token, permissions, status
+- Frontend components/FacebookConnect.jsx: FacebookConnect (button, page picker, auto-connect when only 1 page, connected card with Change page / Disconnect, manual setup under "Advanced") + MetaSetupCard (admin-only 7-step guide with copy boxes) in Channels
+- Verified: tests/check_facebook_connect.py (Graph STUBBED) all steps pass; UI screenshots desktop + 390; manual Messenger flow still works (tests/check_messenger_flow.py)
+- NOT tested against real Meta (no app yet). Meta requires a Privacy Policy URL; App Review + Business verification needed before non-tester shops can connect

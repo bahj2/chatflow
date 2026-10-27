@@ -69,6 +69,8 @@ class Settings(BaseModel):
     telegram_token: str = ""
     fb_page_token: str = ""
     fb_page_id: str = ""
+    fb_page_name: str = ""
+    fb_oauth: bool = False  # page connected with the "Connect with Facebook" button (platform Meta app)
     fb_verify_token: str = ""
     fb_app_secret: str = ""
     quick_replies: List[QuickReply] = Field(default_factory=lambda: [QuickReply(**q) for q in DEFAULT_QUICK])

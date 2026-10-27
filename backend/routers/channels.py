@@ -46,4 +46,6 @@ async def channels_status(user=Depends(current_user)):
             tg["bot"] = me_r.get("result", {}).get("username")
         except Exception:
             pass
-    return {"telegram": tg, "messenger": {"configured": bool(s.fb_page_token and s.fb_verify_token and s.fb_app_secret)}}
+    manual = bool(s.fb_page_token and s.fb_verify_token and s.fb_app_secret and not s.fb_oauth)
+    return {"telegram": tg, "messenger": {"configured": manual or bool(s.fb_oauth and s.fb_page_id), "manual": manual,
+                                         "oauth": bool(s.fb_oauth and s.fb_page_id), "page_name": s.fb_page_name}}
