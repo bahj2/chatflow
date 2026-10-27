@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
 import notion_kb as N
-from core import db, now_iso, current_user, require_pro, rate_ok
+from core import db, now_iso, current_user, owner_only, require_pro, rate_ok
 
 router = APIRouter(prefix="/api")
 
@@ -32,9 +32,9 @@ async def notion_status(user=Depends(current_user)):
 
 
 @router.post("/notion/connect")
-async def notion_connect(body: NotionConnectIn, bg: BackgroundTasks, user=Depends(current_user)):
+async def notion_connect(body: NotionConnectIn, bg: BackgroundTasks, user=Depends(owner_only)):
     await require_pro(user["business_id"])
-    if not rate_ok([(f"nconn:{user['business_id']}", 10, 3600)]):
+    if not await rate_ok([(f"nconn:{user['business_id']}", 10, 3600)]):
         raise HTTPException(429, "Too many tries. Please wait a few minutes.")
     token = body.token.strip()
     if not re.fullmatch(r"(ntn_|secret_)[A-Za-z0-9_-]{10,}", token):
@@ -57,7 +57,7 @@ async def notion_connect(body: NotionConnectIn, bg: BackgroundTasks, user=Depend
 async def notion_sync_now(bg: BackgroundTasks, user=Depends(current_user)):
     bid = user["business_id"]
     await require_pro(bid)
-    if not rate_ok([(f"nsync:{bid}", 30, 3600)]):
+    if not await rate_ok([(f"nsync:{bid}", 30, 3600)]):
         raise HTTPException(429, "Too many syncs. Please wait a few minutes.")
     res = await db.notion_links.update_one({"business_id": bid, "status": {"$ne": "syncing"}}, {"$set": {"status": "queued"}})
     if not res.matched_count and not await db.notion_links.find_one({"business_id": bid}, {"_id": 1}):
@@ -67,7 +67,7 @@ async def notion_sync_now(bg: BackgroundTasks, user=Depends(current_user)):
 
 
 @router.delete("/notion")
-async def notion_disconnect(user=Depends(current_user)):
+async def notion_disconnect(user=Depends(owner_only)):
     await db.notion_links.delete_one({"business_id": user["business_id"]})
     await db.notion_docs.delete_many({"business_id": user["business_id"]})
     return {"connected": False}

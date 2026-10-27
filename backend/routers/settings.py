@@ -5,14 +5,27 @@ from fastapi import APIRouter, HTTPException, Depends
 
 import billing as B
 import payments as P
-from core import db, EMAIL_RE, Settings, get_settings, current_user
+from core import db, EMAIL_RE, Settings, get_settings, current_user, is_owner
 
 router = APIRouter(prefix="/api")
 
 
+# Payment account, channel keys and team list: only the shop owner may see the secrets or change these.
+OWNER_FIELDS = ("allowed_emails", "telegram_token", "fb_page_token", "fb_app_secret", "fb_verify_token",
+                "bakong_account_id", "bakong_merchant_name", "bakong_city", "khqr_token")
+SECRET_FIELDS = ("telegram_token", "fb_page_token", "fb_app_secret", "fb_verify_token", "khqr_token")
+
+
+def for_user(s: Settings, user: dict) -> dict:
+    d = s.model_dump()
+    if not is_owner(user):
+        d.update({k: "" for k in SECRET_FIELDS})
+    return d
+
+
 @router.get("/settings")
 async def read_settings(user=Depends(current_user)):
-    return (await get_settings(user["business_id"])).model_dump()
+    return for_user(await get_settings(user["business_id"]), user)
 
 
 TG_TAKEN = "This Telegram bot is already connected to another shop. Each shop needs its own bot: create a new one with @BotFather."
@@ -38,6 +51,9 @@ async def fb_page_id(token: str) -> str:
 @router.put("/settings")
 async def write_settings(body: Settings, user=Depends(current_user)):
     bid = user["business_id"]
+    if not is_owner(user):
+        cur = await get_settings(bid)
+        body = body.model_copy(update={k: getattr(cur, k) for k in OWNER_FIELDS})
     body.allowed_emails = sorted({e.strip().lower() for e in body.allowed_emails if re.fullmatch(EMAIL_RE, e.strip())})
     cur = await get_settings(bid)
     team = (await B.sub_status(db, bid))["team"]
@@ -64,4 +80,4 @@ async def write_settings(body: Settings, user=Depends(current_user)):
         raise HTTPException(400, "KHQR.dev token must start with rbk")
     await db.settings.update_one({"business_id": bid}, {"$set": body.model_dump()}, upsert=True)
     await db.businesses.update_one({"id": bid}, {"$set": {"name": body.business_name}})
-    return body.model_dump()
+    return for_user(body, user)

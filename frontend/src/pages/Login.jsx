@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Link, useLocation } from "react-router-dom";
 import { AuthShell, authCard, googleBtn, Divider } from "@/components/AuthShell";
 import { useAuth, errMsg } from "@/lib/auth";
@@ -19,7 +19,8 @@ export default function Login() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(location.state?.error || "");
+  const [error, setError] = useState(() => location.state?.error || sessionStorage.getItem("rf_notice") || "");
+  useEffect(() => { sessionStorage.removeItem("rf_notice"); }, []);
   const [busy, setBusy] = useState(false);
   if (user) return <Navigate to="/dashboard" replace />;
   const google = googleRedirect;

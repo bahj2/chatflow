@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Save, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { api, errMsg } from "@/lib/auth";
+import { api, errMsg, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +22,12 @@ export const Section = ({ title, desc, children }) => (
 
 export const Field = ({ label, children }) => (
   <label className="block"><span className="text-xs font-medium text-muted-foreground mb-1.5 block">{label}</span>{children}</label>
+);
+
+export const OwnerOnly = ({ testid }) => (
+  <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={testid}>
+    <Lock className="h-4 w-4 shrink-0" /> Only the shop owner can see or change this.
+  </p>
 );
 
 const Locked = ({ title, desc, what, text, testid }) => <Section title={title} desc={desc}><ProNote what={what} text={text} testid={testid} /></Section>;
@@ -62,6 +68,8 @@ export default function SettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const { billing } = useBilling();
+  const { user } = useAuth();
+  const owner = user?.role !== "member";
   const pro = billing?.sub.pro;
   const team = billing?.sub.team;
   const teamFull = Boolean(team) && s?.allowed_emails.length >= team - 1;
@@ -134,9 +142,11 @@ export default function SettingsPanel() {
         {pro === false ? <Locked title="Notion knowledge" desc="Let the AI read your Notion pages — shop info, FAQs, prices and policies." what="Notion knowledge" testid="pro-lock-notion" />
           : <NotionSection Section={Section} />}
 
-        <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
+        {owner ? <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
+          : <Section title="Bakong KHQR payments" desc="Where customers' order payments go."><OwnerOnly testid="owner-only-payments" /></Section>}
 
-        <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own).">
+        {!owner ? <Section title="Team access" desc="Who can sign in to this shop."><OwnerOnly testid="owner-only-team" /></Section> : (
+        <Section title="Team access" desc="Teammates’ Google emails. When they click “Continue with Google” they join this business’s inbox (instead of creating their own). Removing an email signs that teammate out right away.">
           {team && <p className="text-xs text-muted-foreground" data-testid="team-limit">Your plan includes {team >= 1000 ? "unlimited" : team} login{team === 1 ? "" : "s"} (you{team > 1 ? ` + ${team >= 1000 ? "any number of" : team - 1} teammate${team === 2 ? "" : "s"}` : ""}).</p>}
           {teamFull && <ProNote testid="pro-lock-team" text={team === 1 ? "Teammate logins are included in the Pro and Business plans." : "You've used all the logins in your plan. Upgrade to add more teammates."} />}
           <div className="flex gap-2">
@@ -154,6 +164,7 @@ export default function SettingsPanel() {
             ))}
           </div>
         </Section>
+        )}
 
         <Section title="Quick replies" desc="Saved answers (prices, address, hours…) that send with one tap from the inbox.">
           {s.quick_replies.map((r, i) => (

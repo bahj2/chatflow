@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Copy, Send, Facebook, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
+import { OwnerOnly } from "@/components/SettingsPanel";
 import { Input } from "@/components/ui/input";
 import { Section, Field } from "@/components/SettingsPanel";
 
@@ -24,8 +25,16 @@ const Head = ({ Icon, color, name }) => (
   <span className="flex items-center gap-2"><Icon className="h-5 w-5" style={{ color }} />{name}</span>
 );
 
+const SaveBtn = ({ which, label, busy, onSave }) => (
+  <button onClick={() => onSave(which)} disabled={!!busy} data-testid={`save-${which}-btn`}
+    className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2 text-sm font-semibold disabled:opacity-60">
+    {busy === which && <Loader2 className="h-4 w-4 animate-spin" />}{label}
+  </button>
+);
+
 export default function ChannelsPanel() {
   const { user } = useAuth();
+  const owner = user?.role !== "member";
   const [s, setS] = useState(null);
   const [st, setSt] = useState(null);
   const [busy, setBusy] = useState("");
@@ -45,12 +54,6 @@ export default function ChannelsPanel() {
       loadStatus();
     } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); }
   };
-  const Btn = ({ which, label }) => (
-    <button onClick={() => save(which)} disabled={!!busy} data-testid={`save-${which}-btn`}
-      className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2 text-sm font-semibold disabled:opacity-60">
-      {busy === which && <Loader2 className="h-4 w-4 animate-spin" />}{label}
-    </button>
-  );
 
   return (
     <div className="h-full overflow-y-auto">
@@ -61,20 +64,24 @@ export default function ChannelsPanel() {
         <Section title={<Head Icon={Send} color="#229ED9" name="Telegram" />} desc="Open @BotFather in Telegram → /newbot → copy the token here.">
           <div className="flex gap-4"><Status ok={st?.telegram.configured} label="Token saved" /><Status ok={st?.telegram.connected} label="Webhook connected" /></div>
           {st?.telegram.bot && <p className="text-sm" data-testid="telegram-bot-name">Bot: <a className="text-sky-600 dark:text-sky-400" href={`https://t.me/${st.telegram.bot}`} target="_blank" rel="noreferrer">@{st.telegram.bot}</a></p>}
-          <Field label="Bot token"><Input type="password" value={s.telegram_token} onChange={set("telegram_token")} placeholder="123456789:AA..." data-testid="telegram-token-input" /></Field>
-          <Btn which="telegram" label="Save & connect" />
+          {owner ? <>
+            <Field label="Bot token"><Input type="password" value={s.telegram_token} onChange={set("telegram_token")} placeholder="123456789:AA..." data-testid="telegram-token-input" /></Field>
+            <SaveBtn which="telegram" label="Save & connect" busy={busy} onSave={save} />
+          </> : <OwnerOnly testid="owner-only-telegram" />}
         </Section>
 
         <Section title={<Head Icon={Facebook} color="#0084FF" name="Messenger" />} desc="In Meta for Developers: create an app → add Messenger → generate a Page access token → set the webhook below with your verify token, subscribe to 'messages'.">
           <Status ok={st?.messenger.configured} label="Configured" />
           <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger/${user.business_id}`} testid="messenger-callback-url" /></Field>
+          {owner ? <>
           <div className="grid sm:grid-cols-3 gap-4">
             <Field label="Page access token"><Input type="password" value={s.fb_page_token} onChange={set("fb_page_token")} data-testid="fb-page-token-input" /></Field>
             <Field label="App secret (App settings → Basic)"><Input type="password" value={s.fb_app_secret} onChange={set("fb_app_secret")} data-testid="fb-app-secret-input" /></Field>
             <Field label="Verify token (any secret word)"><Input value={s.fb_verify_token} onChange={set("fb_verify_token")} data-testid="fb-verify-token-input" /></Field>
           </div>
           <p className="text-xs text-muted-foreground/80 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Every incoming message is checked with your App secret — fake messages are rejected.</p>
-          <Btn which="messenger" label="Save" />
+          <SaveBtn which="messenger" label="Save" busy={busy} onSave={save} />
+          </> : <OwnerOnly testid="owner-only-messenger" />}
         </Section>
       </div>
     </div>

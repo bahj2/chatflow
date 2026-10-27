@@ -2,7 +2,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from core import db, get_settings, current_user
+from core import db, get_settings, current_user, owner_only
 from routers.settings import TG_TAKEN, same_bot, taken_by_other
 from routers.webhooks import tg_secret
 
@@ -13,7 +13,7 @@ class TelegramConnectIn(BaseModel):
     base_url: str
 
 @router.post("/channels/telegram/connect")
-async def telegram_connect(body: TelegramConnectIn, user=Depends(current_user)):
+async def telegram_connect(body: TelegramConnectIn, user=Depends(owner_only)):
     bid = user["business_id"]
     s = await get_settings(bid)
     if not s.telegram_token:

@@ -8,8 +8,7 @@ load_dotenv(ROOT_DIR / '.env')
 import os  # noqa: E402
 import time  # noqa: E402
 import logging  # noqa: E402
-from collections import deque  # noqa: E402
-from datetime import datetime, timezone  # noqa: E402
+from datetime import datetime, timedelta, timezone  # noqa: E402
 from typing import List, Literal  # noqa: E402
 
 import bcrypt  # noqa: E402
@@ -104,6 +103,38 @@ async def current_user(request: Request):
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(401, "User not found")
+    if payload.get("tv", 0) != user.get("token_version", 0):
+        raise HTTPException(401, "Your session has ended. Please sign in again.")
+    problem = await member_problem(user)
+    if problem:
+        raise HTTPException(401, problem)
+    return user
+
+
+MEMBER_REMOVED = "Your access to this shop was removed. Ask the shop owner to add your email again."
+MEMBER_OVER_PLAN = "This shop's plan doesn't include your login right now. Ask the shop owner to renew or upgrade the plan."
+
+
+async def member_problem(user: dict) -> str:
+    """Teammates keep access only while their email is in Team access and the shop's plan includes their login."""
+    if user.get("role") != "member":
+        return ""
+    s = await db.settings.find_one({"business_id": user["business_id"]}, {"_id": 0, "allowed_emails": 1})
+    emails = sorted((s or {}).get("allowed_emails") or [])
+    if user["email"] not in emails:
+        return MEMBER_REMOVED
+    if emails.index(user["email"]) >= (await B.sub_status(db, user["business_id"]))["team"] - 1:
+        return MEMBER_OVER_PLAN
+    return ""
+
+
+def is_owner(user: dict) -> bool:
+    return user.get("role") != "member"
+
+
+async def owner_only(user=Depends(current_user)):
+    if not is_owner(user):
+        raise HTTPException(403, "Only the shop owner can do this.")
     return user
 
 EMAIL_RE = r"[^@\s]+@[^@\s]+\.[^@\s]+"
@@ -126,9 +157,6 @@ async def require_pro(bid: str):
     if not (await B.sub_status(db, bid))["pro"]:
         raise HTTPException(402, B.PRO_ONLY)
 
-RATE = {}
-
-
 PROXY_HOPS = 2  # Cloudflare + load balancer append after the real client IP
 
 
@@ -139,19 +167,12 @@ def client_ip(request: Request) -> str:
     return parts[0] if parts else request.client.host
 
 
-def rate_ok(rules) -> bool:
+async def rate_ok(rules) -> bool:
+    """Sliding-window limits stored in MongoDB, so they survive restarts and are shared by every server."""
     now = time.time()
-    if len(RATE) > 20000:
-        for k in [k for k, q in RATE.items() if not q or q[-1] < now - 3600]:
-            RATE.pop(k, None)
-    queues = []
     for key, limit, window in rules:
-        q = RATE.setdefault(key, deque())
-        while q and q[0] < now - window:
-            q.popleft()
-        if len(q) >= limit:
+        if await db.rate_hits.count_documents({"k": key, "t": {"$gt": now - window}}) >= limit:
             return False
-        queues.append(q)
-    for q in queues:
-        q.append(now)
+    expire = datetime.now(timezone.utc)
+    await db.rate_hits.insert_many([{"k": key, "t": now, "exp": expire + timedelta(seconds=window)} for key, _, window in rules])
     return True

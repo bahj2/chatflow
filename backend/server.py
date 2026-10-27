@@ -22,6 +22,8 @@ app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.envi
 async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.rate_hits.create_index([("k", 1), ("t", -1)])
+    await db.rate_hits.create_index("exp", expireAfterSeconds=0)
     try:
         await db.conversations.drop_index("channel_1_external_id_1")
     except OperationFailure:

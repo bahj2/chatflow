@@ -24,6 +24,20 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    // Session ended on the server (teammate removed, plan ended, signed out elsewhere): go back to sign-in with the reason
+    const id = api.interceptors.response.use((r) => r, (e) => {
+      const url = e?.config?.url || "";
+      if (e?.response?.status === 401 && !/^\/auth\/(login|register|google)/.test(url) && localStorage.getItem("rf_token")) {
+        localStorage.removeItem("rf_token");
+        sessionStorage.setItem("rf_notice", errMsg(e));
+        setUser(false);
+      }
+      return Promise.reject(e);
+    });
+    return () => api.interceptors.response.eject(id);
+  }, []);
+
+  useEffect(() => {
     // Returning from Google: AuthCallback exchanges session_id first
     if (window.location.hash?.includes("session_id=")) return;
     if (!localStorage.getItem("rf_token")) return setUser(false);
@@ -33,6 +47,7 @@ export const AuthProvider = ({ children }) => {
   const save = (data) => {
     localStorage.setItem("rf_token", data.token);
     setUser(data.user);
+    return data;
   };
   const login = async (email, password) => save((await api.post("/auth/login", { email, password })).data);
   const register = async (body) => save((await api.post("/auth/register", body)).data);

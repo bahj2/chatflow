@@ -52,7 +52,7 @@ const Hero = () => (
           Every client message,<br />answered in <span className="text-brand">seconds.</span>
         </h1>
         <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed">
-          ReplyFlow's AI understands what your customers want and replies instantly on all your channels — in their language, in your tone. Jump in anytime with one-tap suggested replies.
+          ReplyFlow’s AI understands what your customers want and replies instantly on all your channels — in their language, in your tone. Jump in anytime with one-tap suggested replies.
         </p>
         <div className="mt-10 flex flex-wrap gap-3 sm:gap-4">
           <Link to="/signup" data-testid="hero-get-started-btn" className="inline-flex items-center gap-2 rounded-full btn-brand px-7 py-3.5 font-semibold">

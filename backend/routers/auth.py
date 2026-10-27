@@ -7,7 +7,7 @@ import jwt
 from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
 
-from core import db, JWT_SECRET, JWT_ALG, EMAIL_RE, Settings, now_iso, hash_pw, verify_pw, current_user, client_ip, rate_ok
+from core import db, JWT_SECRET, JWT_ALG, EMAIL_RE, Settings, now_iso, hash_pw, verify_pw, current_user, client_ip, rate_ok, member_problem
 
 router = APIRouter(prefix="/api")
 
@@ -28,11 +28,15 @@ async def login(body: LoginIn, request: Request):
         await db.login_attempts.update_one({"identifier": ident}, {"$inc": {"count": 1}, "$set": {"last": now_iso()}}, upsert=True)
         raise HTTPException(401, "Invalid email or password")
     await db.login_attempts.delete_one({"identifier": ident})
+    problem = await member_problem(user)
+    if problem:
+        raise HTTPException(403, problem)
     return await issue_token(user)
 
 
 async def issue_token(user: dict) -> dict:
-    token = jwt.encode({"sub": user["id"], "email": user["email"], "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, JWT_SECRET, algorithm=JWT_ALG)
+    token = jwt.encode({"sub": user["id"], "email": user["email"], "tv": user.get("token_version", 0),
+                        "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}, JWT_SECRET, algorithm=JWT_ALG)
     biz = await db.businesses.find_one({"id": user["business_id"]}, {"_id": 0, "name": 1})
     return {"token": token, "user": {"id": user["id"], "email": user["email"], "name": user.get("name"), "picture": user.get("picture"),
                                      "role": user.get("role"), "business_id": user["business_id"], "business_name": (biz or {}).get("name")}}
@@ -55,14 +59,14 @@ async def register(body: RegisterIn, request: Request):
     email = body.email.strip().lower()
     if not re.fullmatch(EMAIL_RE, email):
         raise HTTPException(400, "Please enter a valid email")
-    if not rate_ok([(f"reg:{client_ip(request)}", 10, 3600)]):
+    if not await rate_ok([(f"reg:{client_ip(request)}", 10, 3600)]):
         raise HTTPException(429, "Too many sign-ups from this network. Try again later.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "An account with this email already exists. Please sign in.")
     uid = str(uuid.uuid4())
     bid = await create_business(body.business_name.strip(), uid)
     user = {"id": uid, "email": email, "name": body.business_name.strip(), "password_hash": hash_pw(body.password),
-            "role": "owner", "business_id": bid, "created_at": now_iso()}
+            "role": "owner", "business_id": bid, "email_verified": False, "created_at": now_iso()}
     await db.users.insert_one(dict(user))
     return await issue_token(user)
 
@@ -83,8 +87,20 @@ async def google_login(body: GoogleIn):
         raise HTTPException(401, "Google sign-in failed. Please try again.")
     email = g["email"].strip().lower()
     user = await db.users.find_one({"email": email}, {"_id": 0})
+    password_off = False
     if user:
-        await db.users.update_one({"email": email}, {"$set": {"picture": g.get("picture"), "name": user.get("name") or g.get("name")}})
+        problem = await member_problem(user)
+        if problem:
+            raise HTTPException(403, problem)
+        upd = {"$set": {"picture": g.get("picture"), "name": user.get("name") or g.get("name"), "email_verified": True}}
+        if user.get("password_hash") and user.get("email_verified") is False and user.get("role") != "superadmin":
+            # The password was set at sign-up without proving the email. Google now proves who owns it, so a password
+            # someone else may have set is turned off and every older session is signed out.
+            upd["$unset"] = {"password_hash": ""}
+            upd["$inc"] = {"token_version": 1}
+            user["token_version"] = user.get("token_version", 0) + 1
+            password_off = True
+        await db.users.update_one({"email": email}, upd)
         user["picture"] = g.get("picture")
     else:
         uid = str(uuid.uuid4())
@@ -94,9 +110,9 @@ async def google_login(body: GoogleIn):
         else:
             bid, role = await create_business(f"{g.get('name') or email.split('@')[0]}'s business", uid), "owner"
         user = {"id": uid, "email": email, "name": g.get("name"), "picture": g.get("picture"), "role": role, "auth": "google",
-                "business_id": bid, "created_at": now_iso()}
+                "business_id": bid, "email_verified": True, "created_at": now_iso()}
         await db.users.insert_one(dict(user))
-    return await issue_token(user)
+    return {**await issue_token(user), "password_off": password_off}
 
 
 @router.get("/auth/me")

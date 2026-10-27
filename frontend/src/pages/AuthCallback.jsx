@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth, errMsg } from "@/lib/auth";
 
 export default function AuthCallback() {
@@ -13,7 +14,10 @@ export default function AuthCallback() {
     done.current = true;
     const sid = new URLSearchParams(hash.slice(1)).get("session_id");
     loginGoogle(sid)
-      .then(() => navigate("/dashboard", { replace: true }))
+      .then((d) => {
+        if (d?.password_off) toast.info("Google confirmed this email is yours, so the password set at sign-up was turned off for your safety. Use Continue with Google to sign in.", { duration: 10000 });
+        navigate("/dashboard", { replace: true });
+      })
       .catch((e) => {
         failGoogle();
         navigate("/login", { replace: true, state: { error: errMsg(e) } });
