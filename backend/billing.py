@@ -84,7 +84,7 @@ def effective(s, v: dict):
 
 
 def auto_confirm(ps) -> bool:
-    return bool(ps) and (ps.khqr_token or "").strip().startswith(P.RELAY_PREFIX)
+    return bool(ps) and P.can_check(ps.khqr_token)
 
 
 async def reserve(db, bid: str) -> str:
@@ -188,7 +188,7 @@ async def poll(db, ps):
     """Expires unpaid invoices and, with a KHQR.dev token, settles paid ones automatically (late payments within a day too)."""
     await db.invoices.update_many({"status": "pending", "expires_at": {"$lt": iso(now())}}, {"$set": {"status": "expired"}})
     token = (getattr(ps, "khqr_token", "") or "").strip()
-    if not token.startswith(P.RELAY_PREFIX):
+    if not P.can_check(token):
         return
     flt = {"mode": "relay", "status": {"$in": ["pending", "expired"]}, "created_at": {"$gt": iso(now() - timedelta(days=1))}}
     invs = await db.invoices.find(flt, {"_id": 0}).to_list(500)

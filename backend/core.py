@@ -154,7 +154,13 @@ async def get_settings(bid: str) -> Settings:
 async def platform_settings():
     """The superadmin's own business: its Bakong payment details receive the shops' subscription payments."""
     admin = await db.users.find_one({"role": "superadmin"}, {"_id": 0, "business_id": 1})
-    return await get_settings(admin["business_id"]) if admin and admin.get("business_id") else None
+    if not (admin and admin.get("business_id")):
+        return None
+    s = await get_settings(admin["business_id"])
+    env_token = (os.environ.get("BAKONG_TOKEN") or "").strip()  # founder's Bakong Open API token (kept as a secret, not in the DB)
+    if env_token and not (s.khqr_token or "").strip().startswith("rbk"):
+        s = s.model_copy(update={"khqr_token": env_token})
+    return s
 
 async def require_pro(bid: str):
     if not (await B.sub_status(db, bid))["pro"]:

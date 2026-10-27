@@ -9,12 +9,32 @@ from PIL import Image
 
 QR_MINUTES = 10
 RELAY_PREFIX = "rbk"
+JWT_PREFIX = "eyJ"  # Bakong Open API token (api-bakong.nbc.gov.kh), valid 90 days
 ACCOUNT_RE = re.compile(r"^[A-Za-z0-9._-]{2,40}@[A-Za-z0-9._-]{2,20}$")
 _NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 
 class PaymentError(Exception):
     pass
+
+
+def jwt_valid(token: str) -> bool:
+    """A Bakong Open API token that hasn't expired (checked from its own expiry date, no network call)."""
+    import base64, json  # noqa: E401
+    t = (token or "").strip()
+    if not t.startswith(JWT_PREFIX) or t.count(".") != 2:
+        return False
+    try:
+        exp = json.loads(base64.urlsafe_b64decode(t.split(".")[1] + "==")).get("exp", 0)
+    except ValueError:
+        return False
+    return exp > time.time() + 60
+
+
+def can_check(token: str) -> bool:
+    """Payments can be confirmed automatically: KHQR.dev relay token, or a valid Bakong Open API token."""
+    t = (token or "").strip()
+    return t.startswith(RELAY_PREFIX) or jwt_valid(t)
 
 
 def parse_price(text: str):
@@ -116,7 +136,8 @@ async def make_qr(s, amount: float, currency: str, bill: str) -> dict:
             raise PaymentError("Bakong account ID is missing or invalid (example: name@aclb)")
         qr, md5 = await asyncio.to_thread(_local_qr, s.bakong_account_id.strip(), s.bakong_merchant_name or s.business_name,
                                           s.bakong_city or "Phnom Penh", amount, currency, bill)
-        mode, link = "local", None
+        # "relay" = checked automatically; a valid Bakong Open API token checks this locally made QR directly with Bakong
+        mode, link = ("relay" if jwt_valid(token) else "local"), None
     return {"qr": qr, "md5": md5, "mode": mode, "png": await asyncio.to_thread(_png, qr), "deeplink": link}
 
 
@@ -134,6 +155,7 @@ async def token_ok(token: str) -> tuple:
 
 def enabled(s) -> bool:
     return (s.khqr_token or "").strip().startswith(RELAY_PREFIX) or bool(ACCOUNT_RE.match(s.bakong_account_id or ""))
+    # (a Bakong Open API token needs the account ID too: the QR is made locally, the token only checks payments)
 
 
 def fmt_amount(amount: float, currency: str) -> str:

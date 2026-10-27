@@ -234,3 +234,9 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Clients see only "Connect with Facebook" (+ note: "Feature Unavailable" = waiting for Meta approval); Page-token box only for platform admin or shops already connected by token
 - Admin MetaSetupCard → "Show Meta App Review answers": copy-ready texts for pages_show_list, pages_messaging, pages_manage_metadata, public_profile, email, reviewer test steps (uses current site URL) + 7-step ~2-min screen-recording script
 - Approval path for user: Business verification → Become a Tech Provider → App Review (Advanced access) → Live. Recommend publishing the site first so Meta reviews the permanent URL
+
+## Iteration 30 (2026-10) — Founder Bakong account
+- Founder (superadmin business) Bakong account: tit_sambath@bkrt, merchant name "Replyflow AI" → subscription KHQR pays the founder (verified: Starter $10 invoice QR contains tit_sambath@bkrt)
+- Founder's Bakong Open API token kept as secret BAKONG_TOKEN (backend env), injected by core.platform_settings() (unless a KHQR.dev rbk token is saved)
+- payments: jwt_valid() (exp from token, no network) + can_check(); valid JWT → local QR with mode "relay" (auto-checked via KHQR(jwt).check_bulk_payments direct to api-bakong); billing.auto_confirm/poll use can_check
+- The token the user gave EXPIRED 2026-06-06 (Bakong 401) → currently manual confirm in Admin Billing; user must renew at api-bakong.nbc.gov.kh and update BAKONG_TOKEN via secure box
