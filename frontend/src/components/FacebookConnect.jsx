@@ -31,7 +31,7 @@ export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) 
   const [showManual, setShowManual] = useState(false);
   const once = useRef(false);
 
-  const load = () => api.get("/meta/status").then((r) => setMeta(r.data)).catch(() => setMeta({ available: false, connected: false }));
+  const load = () => api.get("/meta/status").then((r) => { setMeta(r.data); return r.data; }).catch(() => { setMeta({ available: false, connected: false }); return null; });
 
   const connectPage = async (id) => {
     setBusy("page"); setErr("");
@@ -47,18 +47,19 @@ export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) 
   useEffect(() => {
     if (once.current) return;
     once.current = true;
-    load();
     const q = new URLSearchParams(window.location.search);
     const e = q.get("fb_error");
     if (q.get("fb") || e) window.history.replaceState(null, "", window.location.pathname);
     if (e) setErr(e);
-    if (q.get("fb") === "pick") {
+    // Back from Facebook (even if the ?fb=pick marker got lost on the way): finish connecting the Page
+    load().then((m) => {
+      if (!m || m.connected || !(m.pending || q.get("fb") === "pick")) return;
       api.get("/meta/facebook/pages").then((r) => {
         const free = r.data.filter((p) => !p.taken);
         if (r.data.length === 1 && free.length === 1) connectPage(free[0].id); // only one Page: no need to ask
         else { setPages(r.data); setPick(free[0]?.id || ""); }
       }).catch((x) => setErr(errMsg(x)));
-    }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -127,7 +128,7 @@ export function FacebookConnect({ owner, manual, manualConfigured, onChanged }) 
       ) : meta.available ? (
         <div className="space-y-2">
           <FbButton onClick={start} busy={busy === "start" || busy === "page"} label={busy === "page" ? "Connecting your Page…" : "Connect with Facebook"} testid="fb-connect-btn" />
-          <p className="text-xs text-muted-foreground">Log in to Facebook, tick your Page, press Continue — that's it. You need to be an admin of the Page.</p>
+          <p className="text-xs text-muted-foreground">Log in to Facebook, tick your Page, press Continue — that’s it. You need to be an admin of the Page.</p>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="fb-not-available">One-click “Connect with Facebook” isn’t switched on yet. You can connect manually below.</p>

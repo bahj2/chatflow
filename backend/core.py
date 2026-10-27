@@ -34,6 +34,7 @@ MODELS = {
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # its request lines include access tokens in URLs
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

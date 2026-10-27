@@ -69,8 +69,10 @@ async def graph(method: str, path: str, **params) -> dict:
 @router.get("/meta/status")
 async def meta_status(user=Depends(current_user)):
     s = await get_settings(user["business_id"])
+    ch = await db.fb_choices.find_one({"business_id": user["business_id"]}, {"_id": 0, "exp": 1})
+    pending = bool(ch and ch["exp"].replace(tzinfo=timezone.utc) > now())  # came back from Facebook, Page not picked yet
     return {"available": available(), "connected": bool(s.fb_oauth and s.fb_page_id), "page_id": s.fb_page_id if s.fb_oauth else "",
-            "page_name": s.fb_page_name if s.fb_oauth else ""}
+            "page_name": s.fb_page_name if s.fb_oauth else "", "pending": pending}
 
 
 class StartIn(BaseModel):
