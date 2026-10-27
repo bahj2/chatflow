@@ -5,7 +5,7 @@ import uuid
 
 import requests
 
-API = "https://chatflow-pilot.preview.emergentagent.com/api"
+API = "https://preview-build-735.preview.emergentagent.com/api"
 r = requests.post(f"{API}/auth/login", json={"email": "loadtest+706ab4fd@example.com", "password": "loadtest123"}).json()
 h, bid = {"Authorization": "Bearer " + r["token"]}, r["user"]["business_id"]
 clip = "/tmp/km_ask_products.mp3"
