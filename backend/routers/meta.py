@@ -205,10 +205,53 @@ async def meta_webhook(request: Request, bg: BackgroundTasks):
 
 
 # ---------- Platform admin: what to paste into the Meta app ----------
+async def app_token(c: dict) -> str:
+    return (await graph("GET", "oauth/access_token", client_id=c["APP_ID"], client_secret=c["APP_SECRET"],
+                        grant_type="client_credentials"))["access_token"]
+
+
+async def webhook_state(c: dict) -> dict:
+    """The Page webhook registered on the Meta app (url + active), or {} if none / keys missing."""
+    if not available():
+        return {}
+    try:
+        subs = (await graph("GET", f"{c['APP_ID']}/subscriptions", access_token=await app_token(c))).get("data", [])
+    except GraphError:
+        return {}
+    page = next((x for x in subs if x.get("object") == "page"), None)
+    return {"url": page.get("callback_url", ""), "active": bool(page.get("active")),
+            "messages": any(f.get("name") == "messages" for f in page.get("fields", []))} if page else {}
+
+
+class BaseIn(BaseModel):
+    base_url: str
+
+
+@router.post("/admin/meta-setup/webhook")
+async def meta_setup_webhook(body: BaseIn, user=Depends(superadmin)):
+    """One click instead of pasting the Callback URL + Verify token into Meta: registers our Page webhook on the app."""
+    if not available():
+        raise HTTPException(400, "Add the App ID and App secret first.")
+    c, url = cfg(), clean_base(body.base_url) + WEBHOOK_PATH
+    try:
+        async with httpx.AsyncClient(timeout=30) as h:
+            r = await h.post(f"{GRAPH}/{c['APP_ID']}/subscriptions", params={"access_token": await app_token(c)},
+                             data={"object": "page", "callback_url": url, "fields": "messages", "verify_token": c["WEBHOOK_VERIFY_TOKEN"]})
+        data = r.json()
+    except GraphError as e:
+        raise HTTPException(400, str(e))
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(502, "Facebook could not be reached. Please try again.")
+    if r.status_code >= 400 or not data.get("success"):
+        raise HTTPException(400, (data.get("error") or {}).get("message") or "Facebook refused the webhook")
+    return {"ok": True, "webhook": await webhook_state(c)}
+
+
 @router.get("/admin/meta-setup")
 async def meta_setup(base_url: str, user=Depends(superadmin)):
     c, base = cfg(), clean_base(base_url)
     return {"app_id_set": bool(c["APP_ID"]), "app_secret_set": bool(c["APP_SECRET"]), "config_id_set": bool(c["LOGIN_CONFIG_ID"]),
             "ready": available(), "redirect_uri": base + CALLBACK_PATH, "webhook_url": base + WEBHOOK_PATH,
             "verify_token": c["WEBHOOK_VERIFY_TOKEN"], "permissions": SCOPES.split(","), "graph_version": GRAPH_VERSION,
-            "pages_connected": await db.settings.count_documents({"fb_oauth": True, "fb_page_id": {"$ne": ""}})}
+            "pages_connected": await db.settings.count_documents({"fb_oauth": True, "fb_page_id": {"$ne": ""}}),
+            "webhook": await webhook_state(c)}

@@ -158,8 +158,15 @@ const Check = ({ ok, label, optional }) => (
 export function MetaSetupCard({ Section }) {
   const [d, setD] = useState(null);
   const [open, setOpen] = useState(false);
+  const [hooking, setHooking] = useState(false);
   useEffect(() => { api.get("/admin/meta-setup", { params: { base_url: BACKEND_URL } }).then((r) => { setD(r.data); setOpen(!r.data.ready); }).catch(() => {}); }, []);
   if (!d) return null;
+  const hookOk = d.webhook?.active && d.webhook?.messages && d.webhook?.url === d.webhook_url;
+  const autoHook = async () => {
+    setHooking(true);
+    try { const { data } = await api.post("/admin/meta-setup/webhook", { base_url: BACKEND_URL }); setD({ ...d, webhook: data.webhook }); toast.success("Message webhook is set up — Facebook confirmed it"); }
+    catch (e) { toast.error(errMsg(e)); } finally { setHooking(false); }
+  };
   const host = new URL(BACKEND_URL).host;
   return (
     <Section title={<span className="flex items-center gap-2"><Facebook className="h-5 w-5" style={{ color: FB_BLUE }} /> Platform Facebook app (one-time setup)</span>}
@@ -170,7 +177,17 @@ export function MetaSetupCard({ Section }) {
           <Check ok={d.app_secret_set} label="App secret" />
           <Check ok={d.config_id_set} label="Login configuration ID" optional />
           <Check ok={d.ready} label={d.ready ? `Button is on · ${d.pages_connected} page${d.pages_connected === 1 ? "" : "s"} connected` : "Button is off"} />
+          {d.ready && <Check ok={hookOk} label={hookOk ? "Message webhook on" : "Message webhook not set"} />}
         </div>
+        {d.ready && !hookOk && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3" data-testid="meta-webhook-missing">
+            <p className="text-sm flex-1 min-w-[12rem]">Facebook doesn’t send Page messages to this address yet{d.webhook?.url ? " (it points to another address)" : ""}. One click fixes it — no need to paste anything in Meta.</p>
+            <button onClick={autoHook} disabled={hooking} data-testid="meta-webhook-auto-btn" style={{ backgroundColor: FB_BLUE }}
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white disabled:opacity-60">
+              {hooking && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Set up message webhook
+            </button>
+          </div>
+        )}
         <button onClick={() => setOpen((v) => !v)} data-testid="meta-setup-toggle" className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
           <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} /> {open ? "Hide" : "Show"} the steps
         </button>
@@ -188,7 +205,7 @@ export function MetaSetupCard({ Section }) {
               <p className="text-xs text-muted-foreground">Optional: <b>Configurations → Create</b> → “User access token” with the permissions below, then send the <b>Configuration ID</b> too.</p>
             </li>
             <li className="space-y-2">
-              <p><b>Messenger → Settings → Webhooks</b> (or <b>Webhooks → Page</b>): paste the Callback URL and Verify token, press <b>Verify and save</b>, then subscribe to <b>messages</b>.</p>
+              <p><b>Message webhook:</b> press <b>Set up message webhook</b> above (easiest), or in Meta open <b>Messenger → Settings → Webhooks</b>, paste the Callback URL and Verify token, press <b>Verify and save</b>, then subscribe to <b>messages</b>.</p>
               <CopyBox value={d.webhook_url} testid="meta-webhook-url" />
               <CopyBox value={d.verify_token} testid="meta-verify-token" />
             </li>
