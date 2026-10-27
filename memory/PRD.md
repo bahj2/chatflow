@@ -241,3 +241,12 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - payments: jwt_valid() (exp from token, no network) + can_check(); valid JWT → local QR with mode "relay" (auto-checked via KHQR(jwt).check_bulk_payments direct to api-bakong); billing.auto_confirm/poll use can_check
 - The token the user gave EXPIRED 2026-06-06 (Bakong 401) → currently manual confirm in Admin Billing; user must renew at api-bakong.nbc.gov.kh and update BAKONG_TOKEN via secure box
 - Iteration 30b: founder can paste a Bakong token (eyJ) in AI Settings → Bakong KHQR payments (superadmin only; shops still rbk only); checked on save (expiry + live Bakong call). bakong_khqr lib reports a rejected token as "UNPAID" → payments now call api-bakong directly for JWT (_bakong), single check_transaction_by_md5 per invoice (bulk endpoint returns 403 HTML to non-Cambodia servers). DB token wins over BAKONG_TOKEN secret; orders loop uses can_check. Founder's current token (secret) is EXPIRED → manual confirm until renewed
+
+## Iteration 31 (2026-10) — KHQR.dev "not working" fix
+- Cause: Vaa's business saved a KHQR.dev token whose store accepts only KHR; USD prices ($25) were rejected → customers got replies without QR; preview 400. Plus KHQR.dev limits: 1 req/s per token and 8 req/60 s per server IP (all shops)
+- payments: convert() at USD_KHR_RATE (default 4100, env) + _relay_any retries in the store's currency and remembers it per token (_store_currency); make_qr returns amount/currency actually in the QR
+- orders: order total/currency = QR amount, price_total/price_currency keep the original; caption "102,500៛ ($25.00)"
+- billing: invoice amount/currency from QR + price_usd (in INV_FIELDS); admin revenue sums price_usd; UI money(amount,currency,priceUsd)
+- _relay_call: per-token 1.1 s spacing; shared per-IP budget (_MAX 7/60 s, 3 kept for customer QRs; background payment check + deeplink only use spare budget); rate limit → follow "Retry in Ns" if it fits else friendly BUSY; IP-limit fills window with entries expiring after the pause (sorted deque); "Failed to validate store payment link" retried up to 2 times
+- /api/payments/preview no longer calls token_ok first (saves a call)
+- Tests: iteration_24/25/26 + tests/test_iter24*, test_iter25_khqr_followups.py (live), test_iter26_khqr_budget_unit.py (19 unit) pass

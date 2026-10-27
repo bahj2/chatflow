@@ -207,7 +207,7 @@ async def admin_rows(db, all_bids: list) -> dict:
         if b not in subs:
             subs[b] = view(await get_sub(db, b))  # older shops: their trial starts now, as it would on their next message
     cost = {u["business_id"]: u for u in await db.ai_usage.find({"month": month()}, {"_id": 0}).to_list(10000)}
-    revenue = {d["_id"]: d["total"] async for d in db.invoices.aggregate([{"$match": {"status": "paid"}}, {"$group": {"_id": "$business_id", "total": {"$sum": "$amount"}}}])}
+    revenue = {d["_id"]: d["total"] async for d in db.invoices.aggregate([{"$match": {"status": "paid"}}, {"$group": {"_id": "$business_id", "total": {"$sum": {"$ifNull": ["$price_usd", "$amount"]}}}}])}  # revenue in USD, also for KHR invoices
     bids = set(subs) | set(cost) | set(revenue)
     return {b: {"billing": subs.get(b), "ai_cost_month": round(cost.get(b, {}).get("cost", 0.0), 4),
                 "ai_calls_month": sum(cost.get(b, {}).get("calls", {}).values()), "revenue": revenue.get(b, 0.0)} for b in bids}

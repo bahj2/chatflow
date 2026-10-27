@@ -134,7 +134,7 @@ def _relay_call(token: str, fn, wait_max: float = 25, keep: int = 0):
         lock = _locks.setdefault(token, threading.Lock())
     with lock:
         start = time.time()
-        for attempt in range(2):
+        for attempt in range(3):  # rate limit: 1 retry; store-link check: up to 2 retries
             wait = _last.get(token, 0) + _GAP - time.time()
             if wait > 0:
                 time.sleep(wait)
@@ -149,13 +149,15 @@ def _relay_call(token: str, fn, wait_max: float = 25, keep: int = 0):
                     m = re.search(r"retry in (\d+)", msg)
                     pause = int(m.group(1)) if m else 2
                     if pause <= left:
-                        if "ip rate limit" in msg:  # the whole server is over: fill the window so others wait too
-                            with _guard:
-                                _calls.extend([time.time()] * max(0, _MAX - len(_calls)))
+                        if "ip rate limit" in msg:  # whole server over the limit: everyone waits `pause` s, then slots free up
+                            with _guard:  # keep the window sorted: the oldest entry must stay in front
+                                merged = sorted(list(_calls) + [time.time() - _WINDOW + pause] * max(0, _MAX - len(_calls)))
+                                _calls.clear()
+                                _calls.extend(merged)
                         time.sleep(pause)
                         continue
                     raise ValueError(BUSY)
-                if attempt == 0 and "validate store payment link" in msg and left > 3:
+                if attempt < 2 and "validate store payment link" in msg and left > 3:
                     time.sleep(2.5)  # KHQR.dev's store-link check fails now and then; a second try usually works
                     continue
                 raise

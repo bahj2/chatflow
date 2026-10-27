@@ -58,11 +58,7 @@ async def payments_preview(user=Depends(current_user)):
     s = await get_settings(user["business_id"])
     if not P.enabled(s):
         raise HTTPException(400, "Add your Bakong account ID (or a KHQR.dev token) and press Save first")
-    if s.khqr_token:
-        ok, err = await P.token_ok(s.khqr_token)
-        if not ok:
-            raise HTTPException(400, f"KHQR.dev token problem: {err}")
-    try:
+    try:  # (making the QR already proves the token works: no separate token check, saves a KHQR.dev call)
         q = await P.make_qr(s, 1.0, "USD", "RF-TEST")
     except Exception as e:
         raise HTTPException(400, f"Could not create the QR: {e}")

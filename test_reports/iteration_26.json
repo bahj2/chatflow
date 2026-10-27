@@ -1,0 +1,37 @@
+{
+  "summary": "Tested KHQR.dev FIX A (retry on 'Failed to validate store payment link') and FIX B (shared per-IP budget) with 19 in-process stub tests (no network). Ran live tests with the real KHR-only token copied into a new test shop. Checked the Billing invoice display (KHR shown with its USD price) in the UI and in the admin API, and re-ran the iter24/iter25 regression suites. FIX A works. The budget/keep logic, background skipping, the 25 s customer wait and the BUSY fail-fast all work. One logic bug: when KHQR.dev returns an IP-limit error, the retry that the code waits for can never succeed. Live: preview returned 200 on 2 of 2 tries, and make_qr($25) gave 102500 KHR. UI: '41,000៛ ($10.00)' and '$10.00' show correctly.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "payments._relay_call (IP rate limit branch)", "issue": "After 'IP Rate limit exceeded ... Retry in Ns' with N <= remaining wait, the code fills _calls with timestamps = now and then sleeps N s. Those entries only expire after 60 s, so the second _budget() call (remaining wait = 25 - N s) always returns False and raises BUSY. The 'Retry in Ns' is never actually followed for IP limits: the customer waits N s and still gets 'KHQR.dev is busy'. Reproduced in test_iter26_khqr_budget_unit.py::test_ip_limit_retry_within_wait_succeeds (IP limit, Retry in 2s, wait_max 25: BUSY after about 2 s). Fix: fill the window with entries that expire after the pause, e.g. _calls.extend([time.time() - _WINDOW + pause] * (_MAX - len(_calls))), so other callers wait N s and this caller can use the next free slot.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "billing.admin_rows revenue", "issue": "Revenue uses $sum of 'amount' across currencies, so a paid 41000 KHR invoice counts as 41000 (shown as USD revenue). Sum price_usd instead, or convert KHR to USD."},
+      {"endpoint": "POST /api/payments/preview", "issue": "The second preview within a minute returned deeplink=null. This is expected (the deeplink uses keep=1 and the window was nearly full after token_ok + create_qr), but each preview uses 3-4 of the 7 shared slots: token_ok + create_qr (+1 the first time to learn the store currency) + deeplink. Consider skipping token_ok in preview, because create_qr already validates the token."},
+      {"endpoint": "test_iter24_khqr_currency_unit.py::test_relay_three_back_to_back", "issue": "Flaky: failed 1 of 2 runs (65 s after the iter25 suite, while the server's own background polling shares the real 8/min IP limit). Passed on retry after 50 s more. Real KHQR.dev budget, not a code bug."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter26_khqr_budget_unit.py", "/app/backend/tests/test_iter26_khqr_live.py", "/app/backend/tests/seed_iter26_ui.py", "/app/test_reports/pytest/iter26_unit.xml"],
+  "action_items": [
+    "Fix the IP-limit branch in payments._relay_call: the filled window entries must expire after 'Retry in Ns', not after 60 s. Otherwise the retry always ends in BUSY.",
+    "Optional: compute admin revenue in USD (sum price_usd) rather than summing mixed KHR/USD amounts.",
+    "Optional: cut KHQR.dev calls in /api/payments/preview (token_ok is redundant before create_qr)."
+  ],
+  "critical_code_review_comments": [
+    "payments.py:152-156: the IP-limit window fill uses time.time(), so the entries last a full 60 s and the subsequent _budget wait of at most 25 s can never succeed.",
+    "billing.py:210: revenue aggregation mixes currencies.",
+    "The uvicorn reloader watches /app/backend/tests, so writing test files restarts the server. That resets the in-memory _calls budget and _store_currency, and the next QR then spends one extra call to relearn the store currency."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter26_khqr_budget_unit.py", "/app/backend/tests/test_iter26_khqr_live.py", "/app/backend/tests/seed_iter26_ui.py"],
+  "success_rate": {"backend": "95% (18/19 unit, 3/3 live, regression iter25 2/2, iter24 unit 2/2 after one flaky retry)", "frontend": "100%"},
+  "seed_data_creation": "seed_iter26_ui.py made test_i26ui@example.com / test12345 with invoices RFTEST1 (41000 KHR, price_usd 10) and RFTEST2 ($10). Cleaned up with 'python tests/seed_iter26_ui.py clean'. The live test shop test_i26_* was cleaned up by its fixture.",
+  "test_credentials": "admin@replyflow.com / admin123; shop owners self-registered",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_iter26_khqr_budget_unit.py is pure in-process (KHQR patched), so it is safe to run any time. Takes about 25 s. test_ip_limit_retry_within_wait_succeeds should pass once the IP-limit fill is fixed. Live suites share KHQR.dev's real 8/min IP limit with the server: wait about 60 s before each and run one at a time (iter26_live about 10 calls, iter25 about 7, iter24 unit about 8). Clear db.rate_hits before registering.",
+  "rca of the issue": "IP-limit retry: _calls.extend([time.time()] * k) books k slots that expire at now+60. After sleeping 'Retry in N' s the loop calls _budget(wait_max - elapsed), which needs about 60 - N s more, more than what is left of the 25 s wait, so it returns False and raises BUSY. Mitigation: timestamp the fill entries at now - _WINDOW + N."
+}
