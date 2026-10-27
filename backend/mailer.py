@@ -108,7 +108,7 @@ async def send_email(*, to: str, subject: str, html: str) -> str | None:
             body = e.response.json()
         except ValueError:
             body = {}
-        if body.get("code") in ("insufficient_credits", "integration_disabled", "daily_limit_reached"):
+        if body.get("code") in ("insufficient_credits", "integration_disabled", "daily_limit_reached", "rate_limited"):
             logger.warning(f"Email paused: {body.get('code')} ({e.response.status_code}): {body.get('message', '')}")
             raise EmailError("Email is temporarily unavailable") from e
         logger.error(f"Email send failed: {e.response.status_code} {e.response.text[:300]}")

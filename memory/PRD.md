@@ -277,3 +277,10 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - New components/AuthFields.jsx: inputs with labels and icons, show/hide password, strength meter (Too weak/Weak/Good/Strong with a checklist), trial badge, secure note.
 - Sign-up now needs 8+ characters with a letter and a number (checked in the browser and in RegisterIn.field_validator in routers/auth.py). Existing logins are not affected.
 - Signup button reads "Start free trial", with a Terms/Privacy note. Login says "Welcome back".
+
+## Iteration 36 (2026-10) — Forgot password (6-digit code by email)
+- Emergent managed email (Resend), backend/mailer.py (guardrail gate + branded HTML template). Env: EMERGENT_EMAIL_KEY, EMAIL_FROM_NAME="Replyflow AI".
+- routers/password_reset.py: POST /api/auth/forgot-password (same answer whether or not the account exists; 1/min + 5/h per email, 10/h per IP; superadmin skipped) and POST /api/auth/reset-password (HMAC-hashed code, 15 min, single use, 5 tries; bumps token_version; auto sign-in).
+- Frontend: /forgot-password (2 steps, 60s resend cooldown, strength meter); "Forgot password?" link on the login page.
+- Live app redeployed at https://www.replyflowai.net (the "Network Error" was fixed by the rebuild).
+- Tested in iteration_31 (100%).
