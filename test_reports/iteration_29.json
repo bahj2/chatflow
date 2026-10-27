@@ -1,0 +1,26 @@
+{
+  "summary": "Iter29: Tested product category + stock tracking (backend + UI), stock PATCH, auto stock decrement on mark-paid, catalog_text/order_problem stock handling, AI sold-out answers, Products summary cards/category chips/stepper, the product dialog stock switch, AI Settings tabs, and mobile layout at 390px. Backend 10/10 pytest passed. All requested frontend flows passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ProductsPanel category filter", "issue": "If a category chip is selected and that category stops existing (its last product is renamed to another category or deleted), `cat` stays set. If no categories are left at all, CategoryChips isn't rendered, so the grid gets stuck on 'No products match these filters' with no way to reset except reloading. Fix: reset cat when !cats.includes(cat).", "selector": "[data-testid='products-category-all']", "priority": "LOW"},
+      {"component": "Product dialog stock input", "issue": "Clearing the stock number input forces it to 0 right away (it can't be blank while typing). Minor UX issue.", "selector": "[data-testid='product-stock-input']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Product dialog / AI tab (dark mode)", "issues": ["On and off switch states look alike in dark mode (light-gray track, dark thumb). Consider using a brand-colored track when checked."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter29_products_stock.py", "/app/backend/tests/seed_iter29_ui.py", "/app/test_reports/pytest/iter29.xml"],
+  "action_items": ["(Optional) reset the category filter when the selected category disappears", "(Optional) make the checked switch more visible in dark mode"],
+  "critical_code_review_comments": [
+    "setStock in ProductsPanel sends one PATCH per click without debounce or ordering. If you click fast, responses can arrive out of order, so the server could keep an older value. Low risk, but you could debounce or send the final value.",
+    "Category chip testids use the raw category name (spaces and unicode allowed). Fine, but harder to select reliably."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter29_products_stock.py", "/app/backend/tests/seed_iter29_ui.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "TEST_iter29 shops and products were created, then fully removed from Mongo (users, businesses, settings, products, orders, subscriptions).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Mark-paid stock test: insert an order doc straight into db.orders (no conversation, so no channel send), then POST /api/orders/{id}/mark-paid. Verified: tracked stock 5-2=3, 1-3 clamped to 0, untracked stays null, a second mark-paid returns 409 with no double decrement. AI test reply correctly used live stock ('3 in stock'). Settings tabs keep state across tabs, and the save persisted the name, FAQ, auto_reply and tone."
+}

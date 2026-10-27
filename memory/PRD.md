@@ -257,3 +257,11 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Design pass: shared PageHeader (components/PageHeader.jsx), grouped sidebar + plan chip, refined Section, tables, plan cards, redesigned KHQR pay dialog.
 - Tested in iteration_28 (100% backend and frontend).
 - Backlog: show the plan chip on mobile; on the deployed app, paste the rbk_ token into the admin AI Settings → Payments (the production DB is separate).
+
+## Iteration 33 (2026-10) — Products stock + categories, AI Settings tabs
+- Products: category + stock (null = not tracked). PATCH /api/products/{id}/stock. Stock goes down by itself when an order is paid (orders.settle_order). AI catalog shows the stock; order_problem blocks sold-out items and quantities above what's left.
+- Products page: summary cards (total/in/low ≤3/sold out) that filter the grid, category chips, stock pill + stepper on each card, dialog with category + Track stock switch.
+- AI Settings split into tabs: Business / AI & voice / Knowledge / Payments / Team.
+- Switch "on" is now emerald so it's visible in dark mode.
+- Tested in iteration_29 (100%); the LOW issues it found are fixed.
+- Backlog: product variants (sizes/colors), SKU, hide product from AI, low-stock alert, CSV import/export, personality presets, shop hours.

@@ -21,7 +21,7 @@ const StockField = ({ f, setF }) => {
         <div><p className="text-sm font-medium">Track stock</p><p className="text-[11px] text-muted-foreground">Goes down by itself when an order is paid. At 0 the AI says it&apos;s sold out.</p></div>
         <Switch checked={on} onCheckedChange={(v) => setF((x) => ({ ...x, stock: v ? 10 : null }))} data-testid="product-stock-switch" />
       </div>
-      {on && <Input type="number" min={0} value={f.stock} onChange={(e) => setF((x) => ({ ...x, stock: e.target.value === "" ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0) }))} data-testid="product-stock-input" placeholder="Units in stock" />}
+      {on && <Input type="number" min={0} value={f.stock} onChange={(e) => setF((x) => ({ ...x, stock: e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value, 10) || 0) }))} data-testid="product-stock-input" placeholder="Units in stock" />}
     </div>
   );
 };
@@ -47,7 +47,7 @@ const ProductForm = ({ initial, cats, onClose, onSaved }) => {
     if (!f.name.trim()) return toast.error("Product name is required");
     setSaving(true);
     try {
-      const body = { name: f.name, price: f.price, description: f.description, image_media_id: f.image_media_id, category: f.category.trim(), stock: f.stock };
+      const body = { name: f.name, price: f.price, description: f.description, image_media_id: f.image_media_id, category: f.category.trim(), stock: f.stock === "" ? 0 : f.stock };
       if (initial?.id) await api.put(`/products/${initial.id}`, body); else await api.post("/products", body);
       toast.success("Product saved");
       onSaved();
@@ -130,6 +130,7 @@ export default function ProductsPanel() {
   };
   if (!items) return <div className="p-8 text-muted-foreground/80">Loading…</div>;
   const cats = [...new Set(items.map((p) => p.category).filter(Boolean))].sort();
+  if (cat && !cats.includes(cat)) setCat("");
   const list = items.filter((p) => match(p, q, cat, view));
 
   return (
