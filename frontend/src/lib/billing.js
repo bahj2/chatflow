@@ -26,7 +26,7 @@ export const money = (amount, currency = "USD", priceUsd = null) =>
 export const usePro = () => useContext(BillingCtx).billing?.sub.pro;
 
 export const PLAN_FEATURES = {
-  starter: ["1 Telegram bot + 1 Facebook page", "Products with photos", "Bakong KHQR payments", "Understands voice messages (answers in text)", "AI customer summaries & suggested replies", "1 login"],
+  starter: ["1 Telegram bot + 1 Facebook page (Facebook coming soon)", "Products with photos", "Bakong KHQR payments", "Understands voice messages (answers in text)", "AI customer summaries & suggested replies", "1 login"],
   pro: ["Everything in Starter", "Voice replies to voice messages (Khmer)", "Seller voice clone", "Notion knowledge base", "3 logins"],
   business: ["Everything in Pro", "10 logins", "Priority support", "We set up your shop for you"],
 };

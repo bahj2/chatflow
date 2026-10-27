@@ -39,6 +39,11 @@ def available() -> bool:
     return bool(c["APP_ID"] and c["APP_SECRET"] and c["WEBHOOK_VERIFY_TOKEN"])
 
 
+def locked_for(user: dict | None) -> bool:
+    """Until Meta approves the app, only the platform admin can use Facebook; shops see 'Coming soon'."""
+    return (os.environ.get("META_PUBLIC") or "").strip().lower() != "true" and (user or {}).get("role") != "superadmin"
+
+
 def now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -80,7 +85,7 @@ async def meta_status(user=Depends(current_user)):
     connected = bool(s.fb_page_id and (s.fb_oauth or by_token))
     return {"available": available(), "connected": connected, "via": "facebook" if s.fb_oauth else "token" if by_token else "",
             "page_id": s.fb_page_id if connected else "", "page_name": s.fb_page_name if connected else "",
-            "pending": pending, "remembered": remembered}
+            "pending": pending, "remembered": remembered, "locked": locked_for(user)}
 
 
 class StartIn(BaseModel):
@@ -91,6 +96,8 @@ class StartIn(BaseModel):
 
 @router.post("/meta/facebook/start")
 async def facebook_start(body: StartIn, user=Depends(owner_only)):
+    if locked_for(user):
+        raise HTTPException(403, "Facebook Messenger is coming soon.")
     if not available():
         raise HTTPException(503, "Connect with Facebook isn't set up yet. Ask Replyflow AI, or use manual setup below.")
     c = cfg()
@@ -112,6 +119,8 @@ async def facebook_start(body: StartIn, user=Depends(owner_only)):
 async def facebook_quick(body: StartIn, user=Depends(owner_only)):
     """Connect button: if this person already approved Facebook (sign-in or earlier connect), connect at once with no
     Facebook screens. Otherwise return the Facebook login address."""
+    if locked_for(user):
+        raise HTTPException(403, "Facebook Messenger is coming soon.")
     bid = user["business_id"]
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "fb_user_token_enc": 1, "fb_token_exp": 1})
     tok = None
@@ -183,12 +192,12 @@ async def save_choice(bid: str, user_token: str, pages: list):
 # ---------- "Continue with Facebook" sign-in / sign-up (same Meta app, same callback address) ----------
 @router.get("/auth/facebook/available")
 async def facebook_login_available():
-    return {"available": available()}
+    return {"available": available() and not locked_for(None)}
 
 
 @router.post("/auth/facebook/start")
 async def facebook_login_start(body: StartIn, request: Request):
-    if not available():
+    if not available() or locked_for(None):
         raise HTTPException(503, "Facebook sign-in isn't switched on yet. Please use email or Google.")
     if not await rate_ok([(f"fblogin:{client_ip(request)}", 30, 3600)]):
         raise HTTPException(429, "Too many attempts from this network. Try again later.")

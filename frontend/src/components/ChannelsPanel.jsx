@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Send, Facebook, CheckCircle2, Circle, Loader2, ShieldCheck } from "lucide-react";
+import { Send, Facebook, CheckCircle2, Circle, Loader2, ShieldCheck, Plug, Lock } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
 import { OwnerOnly } from "@/components/SettingsPanel";
@@ -18,6 +19,17 @@ const Head = ({ Icon, color, name }) => (
   <span className="flex items-center gap-2"><Icon className="h-5 w-5" style={{ color }} />{name}</span>
 );
 
+const MessengerSoon = () => (
+  <div className="flex items-start gap-4" data-testid="messenger-coming-soon">
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#0084FF]/10 text-[#0084FF]"><Lock className="h-5 w-5" /></span>
+    <div className="space-y-1.5">
+      <p className="font-semibold flex flex-wrap items-center gap-2">Facebook Messenger
+        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300" data-testid="messenger-coming-soon-badge">Coming soon</span></p>
+      <p className="text-sm text-muted-foreground leading-relaxed">We&apos;re finishing Meta&apos;s approval. When it&apos;s ready, you&apos;ll connect your Facebook Page here with one click, with no setup needed. Telegram works today.</p>
+    </div>
+  </div>
+);
+
 const SaveBtn = ({ which, label, busy, onSave }) => (
   <button onClick={() => onSave(which)} disabled={!!busy} data-testid={`save-${which}-btn`}
     className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2 text-sm font-semibold disabled:opacity-60">
@@ -31,8 +43,9 @@ export default function ChannelsPanel() {
   const [s, setS] = useState(null);
   const [st, setSt] = useState(null);
   const [busy, setBusy] = useState("");
+  const [meta, setMeta] = useState(null);
   const loadStatus = () => api.get("/channels/status").then((r) => setSt(r.data));
-  useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); loadStatus(); }, []);
+  useEffect(() => { api.get("/settings").then((r) => setS((cur) => cur || r.data)); loadStatus(); api.get("/meta/status").then((r) => setMeta(r.data)).catch(() => {}); }, []);
   const refresh = () => { loadStatus(); api.get("/settings").then((r) => setS(r.data)); };
   if (!s) return <div className="p-8 text-muted-foreground/80">Loading…</div>;
 
@@ -52,8 +65,7 @@ export default function ChannelsPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <h1 className="font-display text-3xl font-bold">Channels</h1>
-        <p className="text-sm text-muted-foreground mt-1">Connect your channels once. Everything else is automatic.</p>
+        <PageHeader eyebrow="Setup" title="Channels" Icon={Plug} desc="Connect your channels once. Everything else is automatic." />
 
         <Section title={<Head Icon={Send} color="#229ED9" name="Telegram" />} desc="Open @BotFather in Telegram → /newbot → copy the token here.">
           <div className="flex gap-4"><Status ok={st?.telegram.configured} label="Token saved" /><Status ok={st?.telegram.connected} label="Webhook connected" /></div>
@@ -65,7 +77,7 @@ export default function ChannelsPanel() {
         </Section>
 
         <Section title={<Head Icon={Facebook} color="#0084FF" name="Messenger" />} desc="Connect your Facebook Page so Messenger chats land in your Inbox and the AI answers them.">
-          <FacebookConnect owner={owner} manualConfigured={!!st?.messenger.manual} allowManual={user.role === "superadmin"} onChanged={refresh} manual={<>
+          {meta?.locked && !meta?.connected ? <MessengerSoon /> : <FacebookConnect owner={owner} manualConfigured={!!st?.messenger.manual} allowManual={user.role === "superadmin"} onChanged={refresh} manual={<>
             <Status ok={st?.messenger.manual} label="Configured" />
             <p className="text-xs text-muted-foreground">In Meta for Developers: create an app → add Messenger → generate a Page access token → set the webhook below with your verify token, subscribe to &apos;messages&apos;.</p>
             <Field label="Callback URL (paste into Meta webhook settings)"><CopyBox value={`${BACKEND_URL}/api/webhooks/messenger/${user.business_id}`} testid="messenger-callback-url" /></Field>
@@ -76,7 +88,7 @@ export default function ChannelsPanel() {
             </div>
             <p className="text-xs text-muted-foreground/80 flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Every incoming message is checked with your App secret — fake messages are rejected.</p>
             <SaveBtn which="messenger" label="Save" busy={busy} onSave={save} />
-          </>} />
+          </>} />}
         </Section>
 
         {user.role === "superadmin" && <MetaSetupCard Section={Section} />}

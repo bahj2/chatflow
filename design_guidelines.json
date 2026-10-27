@@ -1,7 +1,7 @@
 {
   "project_name": "Replyflow AI",
   "archetype": "High-Contrast AI SaaS & Tactical Cambodian Omnichannel Commerce",
-  "theme_strategy": "Dual-Theme (Light & Dark Mode supported via HSL CSS Variables with explicit toggle)",
+  "theme_strategy": "Dual-Theme (Light & Dark Mode supported via HSL CSS Variables in index.css with crisp surface hierarchy and subtle border contrast)",
   "brand_identity": {
     "logo_url": "https://customer-assets-7cd3h4nn.emergentagent.net/job_chatflow-pilot/artifacts/c8968c4eb6617d84_Replyflow%20AI%20Reminder%20Logo%20%281%29.png",
     "logo_icon_path": "/brand/logo-icon.png",
@@ -14,25 +14,26 @@
   },
   "color_system": {
     "light_mode": {
-      "background": "210 40% 98%",
-      "foreground": "222.2 84% 4.9%",
+      "background": "220 33% 97%",
+      "foreground": "232 52% 14%",
+      "surface": "0 0% 100%",
       "card": "0 0% 100%",
-      "card_foreground": "222.2 84% 4.9%",
+      "card_foreground": "232 52% 14%",
       "popover": "0 0% 100%",
-      "popover_foreground": "222.2 84% 4.9%",
-      "primary": "221.2 83.2% 53.3%",
-      "primary_foreground": "210 40% 98%",
-      "secondary": "210 40% 96.1%",
-      "secondary_foreground": "222.2 47.4% 11.2%",
-      "muted": "210 40% 96.1%",
-      "muted_foreground": "215.4 16.3% 44%",
-      "accent": "158 64% 42%",
-      "accent_foreground": "210 40% 98%",
-      "destructive": "0 84.2% 60.2%",
-      "destructive_foreground": "210 40% 98%",
-      "border": "214.3 31.8% 91.4%",
-      "input": "214.3 31.8% 91.4%",
-      "ring": "221.2 83.2% 53.3%",
+      "popover_foreground": "232 52% 14%",
+      "primary": "243 75% 59%",
+      "primary_foreground": "0 0% 100%",
+      "secondary": "222 30% 94%",
+      "secondary_foreground": "232 52% 14%",
+      "muted": "222 30% 94%",
+      "muted_foreground": "226 14% 40%",
+      "accent": "222 30% 94%",
+      "accent_foreground": "232 52% 14%",
+      "destructive": "0 72% 51%",
+      "destructive_foreground": "0 0% 98%",
+      "border": "222 24% 88%",
+      "input": "222 24% 84%",
+      "ring": "243 75% 59%",
       "ai_bubble_bg": "#EEF2FF",
       "ai_bubble_text": "#1E1B4B",
       "user_bubble_bg": "#2563EB",
@@ -41,25 +42,26 @@
       "warning_amber": "#F59E0B"
     },
     "dark_mode": {
-      "background": "224 71% 4%",
-      "foreground": "210 40% 98%",
-      "card": "222 47% 8%",
-      "card_foreground": "210 40% 98%",
-      "popover": "222 47% 8%",
-      "popover_foreground": "210 40% 98%",
-      "primary": "217.2 91.2% 59.8%",
-      "primary_foreground": "222.2 47.4% 11.2%",
-      "secondary": "217.2 32.6% 17.5%",
-      "secondary_foreground": "210 40% 98%",
-      "muted": "217.2 32.6% 17.5%",
-      "muted_foreground": "215 20.2% 65.1%",
-      "accent": "158 64% 45%",
-      "accent_foreground": "210 40% 98%",
-      "destructive": "0 62.8% 30.6%",
-      "destructive_foreground": "210 40% 98%",
-      "border": "217.2 32.6% 17.5%",
-      "input": "217.2 32.6% 17.5%",
-      "ring": "224.3 76.3% 48%",
+      "background": "224 38% 6%",
+      "foreground": "220 40% 97%",
+      "surface": "224 34% 8%",
+      "card": "224 32% 10%",
+      "card_foreground": "220 40% 97%",
+      "popover": "224 32% 11%",
+      "popover_foreground": "220 40% 97%",
+      "primary": "234 89% 74%",
+      "primary_foreground": "224 38% 6%",
+      "secondary": "222 26% 16%",
+      "secondary_foreground": "220 40% 97%",
+      "muted": "222 26% 15%",
+      "muted_foreground": "218 18% 66%",
+      "accent": "222 26% 16%",
+      "accent_foreground": "220 40% 97%",
+      "destructive": "0 72% 51%",
+      "destructive_foreground": "0 0% 98%",
+      "border": "222 24% 17%",
+      "input": "222 22% 21%",
+      "ring": "234 89% 74%",
       "ai_bubble_bg": "#1E1B4B",
       "ai_bubble_text": "#EEF2FF",
       "user_bubble_bg": "#3B82F6",
@@ -82,68 +84,60 @@
     ]
   },
   "layout_and_pages": {
-    "landing_page": {
-      "nav": "Sticky glassmorphic navbar with logo icon + text 'Replyflow AI', links (Features, Demo, Pricing, Notion KB), Khmer/English switcher, Theme toggle (Sun/Moon), and 'Sign In / Get Started' CTA button.",
-      "hero": "Asymmetric hero with headline 'Every client message, answered in seconds.', Khmer subhead, twin primary buttons ('Start Free Trial', 'Watch Telegram Demo'), and interactive Live Telegram phone mockup displaying Khmer voice-to-voice & product suggestion replies.",
-      "features_grid": "Mode A Bento Grid (12 cols desktop): Hero box for Telegram & FB Messenger omnichannel, VoxCPM2 Khmer Voice Cloning card, Notion KB sync card, Bakong KHQR 1-tap payment card, AI product suggestion with photos card.",
-      "how_it_works": "3-step interactive flow: 1. Connect Channel -> 2. Sync Product Catalog & Notion -> 3. Auto-reply & Collect KHQR Payments.",
-      "footer": "Dark rich contrast footer with company links, Khmer language badge, and large brand mark."
-    },
-    "auth_pages": {
-      "split_layout": "Left column marketing highlight box (Blue-Indigo gradient backdrop with VoxCPM2 voice note visualizer, Bakong KHQR preview, 3 key selling points), right column auth card with Email/Password + Google Login button.",
-      "theme_toggle_location": "Top right corner of the auth container."
-    },
     "dashboard_shell": {
-      "desktop_sidebar": "260px left sidebar with Replyflow AI logo, business switcher dropdown, nav items (Inbox, Products, Orders, AI Settings, Channels, Businesses), Theme toggle, current business status badge, user avatar.",
-      "mobile_bar": "Fixed top header with logo + business selector + Theme toggle, bottom 390px mobile icon navbar for quick switching between Inbox, Products, Orders, AI Settings.",
-      "header_controls": "Includes Business Selector dropdown, AI master toggle (Active / Paused), Light/Dark theme toggle button, and user profile menu."
+      "sidebar": "Professional 260px left navigation bar with Replyflow AI brand header, elevated Business Card with mono eyebrow and vibrant initial badge, smooth active nav indicator (primary fill + left glow accent pill), theme toggle, external link button, and logout button with subtle red hover glow. Preserves all data-testids (dash-logo, dash-business-name, nav-inbox, nav-products, nav-orders, nav-settings, nav-channels, nav-billing, nav-businesses, nav-view-site, logout-btn).",
+      "paused_banner": "High-visibility tactical warning banner across top when subscription or reply limit ends. Includes red indicator icon, explicit pause reason text, and direct upgrade link. Preserves data-testid='paused-banner' and 'paused-banner-link'."
     },
     "inbox_page": {
-      "structure": "3-pane layout (Responsive: 1-pane on 390px mobile with drawer/tab navigation, 3-pane on 1920px desktop).",
-      "left_pane": "Conversation list with channel filters (All, Telegram, Messenger), search input, unread badges, customer avatar, time ago, AI active pill.",
-      "center_pane": "Active Chat Thread with channel banner, customer info, customer/AI/agent speech bubbles, Khmer voice note audio player waveform, AI product recommendation cards with photo + price + 'Send to Chat' button, Bakong KHQR payment request card.",
-      "right_pane": "Customer AI Summary Panel: Buying Intent score, AI Stage (Inquiry -> Product Selection -> Payment Pending -> Completed), Next Suggested Action, Quick Reply Chips (Khmer & English), Human Takeover toggle."
+      "structure": "3-pane professional workspace layout (Conversation List, Active Chat Thread, Customer AI Intelligence Panel).",
+      "left_pane": "Conversation feed with channel tabs (All, Telegram, Facebook Messenger), search bar, unread badges, channel badges (Telegram sky pill, Messenger blue pill), timestamp, and active status indicators.",
+      "center_pane": "Chat Thread with channel banner, clear speech bubbles (AI response in indigo tinted container with AI indicator pill, customer response in primary blue bubble), Khmer voice note visualizer waveform, embedded product recommendations with photo + price in KHR/USD + 'Send to Chat' button, and Bakong KHQR instant request card.",
+      "right_pane": "Customer AI Summary Panel with intent score gauge, purchase stage pipeline pill (Inquiry -> Product Selection -> Payment Pending -> Completed), next action suggestion, fast Khmer/English quick-reply buttons, and Human Takeover toggle switch."
     },
     "products_page": {
-      "layout": "Header with 'Add Product' button, search bar, category tabs. Grid of product cards with rich photo preview, Khmer name, price in USD/KHR, stock status, and actions (Edit, Delete, Recommend in AI)."
+      "layout": "High-density e-commerce catalog grid. Features top summary cards (Total Products, Active Catalog, Out of Stock), search and category filter bar, 'Add Product' primary CTA, and rich product cards with image preview, Khmer/English title, USD/KHR dual pricing, stock status pill, and action menu. Preserves all data-testids."
     },
     "orders_page": {
-      "layout": "Analytics header (Total Revenue, Paid via Bakong, Pending KHQR), Table with order ID, Customer, Channel, Items, Total Price, Status pills (Paid - Emerald, Pending - Amber, Expired - Slate), KHQR invoice modal preview."
+      "layout": "Order Operations Dashboard featuring 3 KPI metric cards (Total Revenue USD/KHR, KHQR Paid Orders, Pending Payments), tab filters (All, Paid, Pending, Expired), structured table with bold monospace Order IDs, customer details, channel tags, total amount, status badges (Paid - Emerald, Pending - Amber, Expired - Slate), and KHQR Invoice preview modal. Preserves all data-testids."
     },
     "ai_settings_page": {
       "sections": [
-        "Business Profile (Shop Name, Description, Greeting Message in Khmer)",
-        "Notion Knowledge Base Integration (Notion API Key, Database Selector, Sync Now status)",
-        "Bakong KHQR Payment Settings (Bakong Account ID, Merchant Name, Auto-generate KHQR toggle)",
-        "Khmer Voice Cloning (VoxCPM2 engine toggle, Seller Voice Clone recorder/uploader with audio wave preview, voice pitch & speed controls)",
-        "AI Behavior & Auto-reply Rules (Tone: Friendly/Professional, Auto-suggest products threshold, Hand-over to human rules)",
-        "Quick Reply Templates & Team Notification emails"
+        "Business Profile & Khmer Auto-Greeting configuration",
+        "Notion Knowledge Base Integration (API Key input, database selector, live sync status badge)",
+        "Bakong KHQR Payment Gateway Setup (Merchant Account ID, Merchant Name, Auto-generate KHQR toggle)",
+        "VoxCPM2 Khmer Voice Cloning System (Voice note recorder/uploader, pitch & speed controls, live audio waveform preview)",
+        "AI Behavior & Escalation Rules (Confidence thresholds, auto-product suggestion toggle, human agent handover rules)"
       ]
     },
     "channels_page": {
       "cards": [
-        "Telegram Bot Integration (Token input, Webhook status, Test Bot Connection button, Connected indicator)",
-        "Facebook Messenger Integration (Page Access Token, App Secret, Connect Page button, Active Webhook badge)"
+        "Telegram Bot Channel (Active state: Bot Token input, Webhook status indicator, Test Connection button, Live status indicator)",
+        "Facebook Messenger Channel (Locked State: Clearly marked as 'Coming Soon' to Cambodian shops pending Meta App Review & approval, disabled token fields, informational banner, 'Notify Me' action)"
+      ]
+    },
+    "billing_page": {
+      "sections": [
+        "Current Plan Card: Displays plan name (Starter, Pro, Business or Trial), active status badge, monthly AI auto-reply usage bar with visual percentage indicator, and subscription renewal date.",
+        "Pricing Tier Grid: 3 distinct plan cards (Starter $10/mo - 1,000 replies, Pro $25/mo - 5,000 replies [Most Popular], Business $59/mo - Unlimited replies) with feature checklists and 'Upgrade with KHQR' action buttons.",
+        "Bakong KHQR Pay Modal: Interactive payment dialog with red KHQR header, high-contrast QR code image, live 15-minute countdown timer, exact KHR amount, merchant name, and auto-verification status indicator.",
+        "Invoice History Table: Table showing past KHQR billing transactions with date, invoice ID, plan name, amount in USD/KHR, and downloadable receipt link."
       ]
     },
     "admin_businesses_page": {
-      "layout": "Table listing 100+ Cambodian shop tenants, active bot status, monthly order count, channels connected, plan subscription, action buttons."
+      "layout": "Superadmin Tenant Management Directory. Table listing registered Cambodian merchant accounts, bot status toggles, monthly message volumes, connected channels, current subscription tier, and quick edit actions. Preserves all data-testids."
     }
   },
   "components_and_styles": {
-    "buttons": "Pill or rounded-lg buttons with vibrant primary gradient (`bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md transition-all`). Secondary buttons: `border border-border bg-card hover:bg-muted text-foreground`.",
+    "buttons": "Primary buttons: `btn-brand font-medium rounded-xl px-4 py-2.5 text-sm transition-all flex items-center justify-center gap-2`. Secondary buttons: `border border-border bg-card hover:bg-muted text-foreground rounded-xl px-4 py-2.5 text-sm font-medium transition-colors`.",
+    "cards": "Subtle border `border border-border bg-card text-card-foreground rounded-2xl shadow-sm p-5 hover:border-border/80 transition-all`.",
+    "tables": "Clean header with uppercase tracking-wider text-xs font-mono text-muted-foreground, hoverable row styling (`hover:bg-muted/40 transition-colors`), crisp bottom borders (`border-b border-border/60`).",
     "badges": {
-      "ai_on": "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5",
-      "telegram": "bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 text-xs px-2 py-0.5 rounded-md",
-      "messenger": "bg-blue-600/15 text-blue-600 dark:text-blue-400 border border-blue-600/30 text-xs px-2 py-0.5 rounded-md",
-      "khqr_paid": "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs px-2 py-0.5 rounded-md"
+      "ai_active": "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1.5",
+      "telegram": "bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 text-xs px-2.5 py-0.5 rounded-md font-medium",
+      "messenger_coming_soon": "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs px-2.5 py-0.5 rounded-md font-medium flex items-center gap-1",
+      "khqr_paid": "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs px-2.5 py-0.5 rounded-md"
     },
-    "chat_bubbles": {
-      "ai": "bg-[#EEF2FF] dark:bg-[#1E1B4B] text-[#1E1B4B] dark:text-[#EEF2FF] border border-indigo-200 dark:border-indigo-900/50 rounded-2xl rounded-tl-sm p-3.5 shadow-sm space-y-2",
-      "user": "bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3.5 shadow-sm",
-      "voice_note": "Flex items-center gap-3 bg-black/5 dark:bg-white/10 rounded-xl p-2 border border-border"
-    },
-    "khqr_card": "Red-accented card inspired by Cambodian Bakong KHQR with QR code illustration, total amount in KHR/USD, merchant name, payment verification status pill."
+    "khqr_modal": "Authentic Cambodian Bakong KHQR visual style: Red accent border header, high-contrast QR code container, live countdown timer badge, exact dollar & riel pricing breakdown."
   },
   "image_urls": {
     "ai_workspace": "https://images.unsplash.com/photo-1758626104169-6835c0bd03e3?crop=entropy&cs=srgb&fm=jpg&q=85",
@@ -152,11 +146,17 @@
     "product_thai_food": "https://images.unsplash.com/photo-1757845301558-e8e7dd41bc64?crop=entropy&cs=srgb&fm=jpg&q=85"
   },
   "general_ui_ux_guidelines": [
-    "All interactive elements (buttons, inputs, filters, tabs, menu items, toggles, cards, actions) MUST include a kebab-case data-testid attribute.",
-    "Support both Light and Dark mode seamlessly via HSL CSS variables configured in index.css.",
-    "Ensure 100% responsiveness from 390px mobile screens to 1920px desktop viewports.",
-    "Khmer text should use 'Noto Sans Khmer' for clean readable typography across headers and body.",
-    "Theme toggle button must be present in Landing navbar, Auth page headers, and Dashboard top header/sidebar.",
-    "Keep existing functionality intact while drastically improving layout, spacing, visual polish, and component design."
+    "CRITICAL REQUIREMENT: All interactive elements (buttons, inputs, navigation links, tabs, dialog triggers, toggle switches, filter buttons) MUST preserve exact existing `data-testid` attributes without omission.",
+    "Facebook Messenger channel MUST display as 'Coming soon' to shops with clear Meta review lock status.",
+    "Maintain the signature Replyflow AI brand identity (blue to indigo to violet gradient) across buttons, active state indicators, and hero brand marks.",
+    "Support both Light and Dark mode flawlessly with high APCA contrast ratios and smooth CSS transitions.",
+    "Ensure 100% responsive design across all screen sizes (mobile 390px to desktop 1920px).",
+    "Khmer script typography must render with Noto Sans Khmer for clear legibility."
+  ],
+  "instructions_to_main_agent": [
+    "Apply whole dashboard professional design pass by refining utility classes and CSS design tokens in index.css and component files.",
+    "Do NOT remove or rename any data-testid attribute.",
+    "Ensure Facebook Messenger card on Channels page shows 'Coming soon' badge.",
+    "Keep all existing backend API calls, state hooks, and functionality intact."
   ]
 }

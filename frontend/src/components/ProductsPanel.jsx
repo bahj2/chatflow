@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Plus, Pencil, Trash2, ImagePlus, Loader2, Package, Search } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/auth";
@@ -83,14 +84,11 @@ export default function ProductsPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-bold">Products</h1>
-            <p className="text-sm text-muted-foreground mt-1">When customers ask about a product, the AI sends its photo, name and price automatically. <span className="text-muted-foreground/80" data-testid="products-count">{items.length} / 300</span></p>
-          </div>
+        <PageHeader eyebrow="Catalog" title="Products" Icon={Package}
+          desc={<>When customers ask about a product, the AI sends its photo, name and price automatically. <span className="font-mono text-xs text-muted-foreground/80" data-testid="products-count">{items.length} / 300</span></>}>
           <button onClick={() => setEditing(EMPTY)} data-testid="add-product-btn"
             className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2.5 text-sm font-semibold"><Plus className="h-4 w-4" /> Add product</button>
-        </div>
+        </PageHeader>
         {items.length > 0 && (
           <div className="relative max-w-sm mt-6">
             <Search className="h-4 w-4 absolute left-3 top-2.5 text-muted-foreground/80" />

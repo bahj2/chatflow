@@ -13,13 +13,25 @@ import OrdersPanel from "@/components/OrdersPanel";
 import BillingPanel from "@/components/BillingPanel";
 
 const NAV = [
-  { to: "/dashboard", label: "Inbox", Icon: InboxIcon, end: true, id: "inbox" },
+  { to: "/dashboard", label: "Inbox", Icon: InboxIcon, end: true, id: "inbox", group: "Workspace" },
   { to: "/dashboard/products", label: "Products", Icon: Package, id: "products" },
   { to: "/dashboard/orders", label: "Orders", Icon: Receipt, id: "orders" },
-  { to: "/dashboard/settings", label: "AI Settings", Icon: Settings2, id: "settings" },
+  { to: "/dashboard/settings", label: "AI Settings", Icon: Settings2, id: "settings", group: "Setup" },
   { to: "/dashboard/channels", label: "Channels", Icon: Plug, id: "channels" },
   { to: "/dashboard/billing", label: "Billing", Icon: CreditCard, id: "billing" },
 ];
+
+const PlanChip = () => {
+  const s = useBilling().billing?.sub;
+  if (!s) return null;
+  const tone = s.paused ? "bg-red-500" : s.exempt || s.days_left > 5 ? "bg-emerald-500" : "bg-amber-500";
+  return (
+    <Link to="/dashboard/billing" className="hidden lg:block rounded-2xl border border-border bg-card px-3 py-2.5 mb-2 transition-colors duration-200 hover:border-primary/40" data-testid="sidebar-plan-chip">
+      <span className="flex items-center justify-between gap-2 text-sm font-semibold"><span className="truncate">{s.exempt ? "Platform" : s.plan_name}</span><span className={`h-2 w-2 shrink-0 rounded-full ${tone}`} /></span>
+      <span className="block text-[11px] text-muted-foreground mt-0.5">{s.exempt ? "Unlimited AI replies" : s.paused ? "AI replies paused" : `${s.days_left} days left · ${s.used.toLocaleString()}/${s.limit.toLocaleString()} replies`}</span>
+    </Link>
+  );
+};
 
 const PausedBanner = () => {
   const s = useBilling().billing?.sub;
@@ -48,25 +60,28 @@ const BusinessCard = ({ name }) => (
 
 const SideNav = ({ nav, grow }) => (
   <nav className={`flex md:flex-col gap-1 md:flex-1 min-w-0 overflow-x-auto md:overflow-visible [scrollbar-width:none] ${grow ? "flex-1" : ""}`}>
-    {nav.map(({ to, label, Icon, end, id }) => (
-      <NavLink key={to} to={to} end={end} data-testid={`nav-${id}`} title={label}
-        className={({ isActive }) => `${item} ${isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/70"}`}>
-        {({ isActive }) => (<>
-          {isActive && <span className="absolute left-0 top-1/2 hidden h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand md:block" />}
-          <Icon className="h-[18px] w-[18px] shrink-0" /><span className="hidden lg:inline">{label}</span>
-        </>)}
-      </NavLink>
+    {nav.map(({ to, label, Icon, end, id, group }) => (
+      <div key={to} className="contents">
+        {group && <p className={`hidden lg:block px-3 pb-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground/70 ${id === "inbox" ? "" : "pt-4"}`}>{group}</p>}
+        <NavLink to={to} end={end} data-testid={`nav-${id}`} title={label}
+          className={({ isActive }) => `${item} ${isActive ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-muted/70"}`}>
+          {({ isActive }) => (<>
+            {isActive && <span className="absolute left-0 top-1/2 hidden h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand md:block" />}
+            <Icon className="h-[18px] w-[18px] shrink-0" /><span className="hidden lg:inline">{label}</span>
+          </>)}
+        </NavLink>
+      </div>
     ))}
   </nav>
 );
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-  const nav = user.role === "superadmin" ? [...NAV, { to: "/dashboard/businesses", label: "Businesses", Icon: Building2, id: "businesses" }] : NAV;
+  const nav = user.role === "superadmin" ? [...NAV, { to: "/dashboard/businesses", label: "Businesses", Icon: Building2, id: "businesses", group: "Admin" }] : NAV;
   return (
     <BillingProvider>
     <div className="h-screen flex flex-col md:flex-row bg-background">
-      <aside className="md:w-20 lg:w-60 shrink-0 border-b md:border-b-0 md:border-r border-border bg-surface flex md:flex-col items-center lg:items-stretch gap-1 px-2 py-2 md:p-3">
+      <aside className="md:w-20 lg:w-64 shrink-0 border-b md:border-b-0 md:border-r border-border bg-surface flex md:flex-col items-center lg:items-stretch gap-1 px-2 py-2 md:p-3 lg:p-4">
         <Link to="/" className="flex shrink-0 items-center gap-2.5 font-display font-bold text-[17px] px-1.5 md:px-2 py-2 md:mb-5" data-testid="dash-logo">
           <BrandMark />
           <span className="hidden lg:inline">{BRAND}</span>
@@ -74,6 +89,7 @@ export default function Dashboard() {
         {user.role !== "superadmin" && <span className="md:hidden flex-1 min-w-0 text-sm font-semibold truncate" data-testid="dash-business-name-mobile">{user.business_name}</span>}
         <BusinessCard name={user.business_name} />
         <SideNav nav={nav} grow={user.role === "superadmin"} />
+        <PlanChip />
         <div className="flex md:flex-col lg:flex-row items-center lg:items-stretch gap-1 md:gap-2 md:pt-3 md:border-t md:border-border">
           <a href="/" target="_blank" rel="noreferrer" title="View website" className={`hidden md:flex ${item} text-muted-foreground hover:text-foreground hover:bg-muted/70 lg:flex-1`} data-testid="nav-view-site">
             <ExternalLink className="h-[18px] w-[18px]" /><span className="hidden lg:inline">Website</span>

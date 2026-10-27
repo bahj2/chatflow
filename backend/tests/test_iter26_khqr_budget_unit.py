@@ -194,7 +194,6 @@ def test_ip_limit_retry_within_wait_succeeds():
 
 def test_ip_limit_other_token_blocked_after_fill():
     """During an IP-limit pause the shared window is full, so other tokens' background calls skip; afterwards it frees up."""
-    import threading
     n = {"c": 0}
 
     def fn(k):

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Building2, Search, MessagesSquare, Bot, Send, Facebook } from "lucide-react";
 import { api } from "@/lib/auth";
 import { PlanCell, SetPlanDialog, PendingInvoices } from "@/components/AdminBilling";
@@ -25,10 +26,7 @@ export default function AdminPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        <div>
-          <h1 className="font-display text-3xl font-bold flex items-center gap-3"><Building2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" /> Businesses</h1>
-          <p className="text-sm text-muted-foreground mt-1">Every business using ReplyFlow. Only you (platform admin) can see this page.</p>
-        </div>
+        <PageHeader eyebrow="Platform admin" title="Businesses" Icon={Building2} desc="Every business using Replyflow AI. Only you (platform admin) can see this page." />
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           <Stat label="Businesses" value={rows.length} testid="admin-stat-businesses" />
           <Stat label="Paying shops" value={rows.filter(paying).length} testid="admin-stat-paying" />
@@ -45,7 +43,7 @@ export default function AdminPanel() {
         </div>
         <div className="rounded-xl border border-border overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]" data-testid="admin-businesses-table">
-            <thead className="bg-card text-xs text-muted-foreground text-left">
+            <thead className="bg-muted/40 text-[11px] font-mono uppercase tracking-wider text-muted-foreground text-left">
               <tr><th className="px-4 py-3">Business</th><th className="px-4 py-3">Owner</th><th className="px-4 py-3">Plan</th><th className="px-4 py-3">Channels</th>
                 <th className="px-4 py-3 text-right">Chats</th><th className="px-4 py-3 text-right">AI replies</th><th className="px-4 py-3 text-right">AI cost (month)</th><th className="px-4 py-3">Joined</th><th className="px-4 py-3" /></tr>
             </thead>

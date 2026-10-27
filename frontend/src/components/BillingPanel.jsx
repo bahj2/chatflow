@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Check, Loader2, Plus, QrCode, CheckCircle2, Clock, Infinity as InfinityIcon, Sparkles } from "lucide-react";
+import { CreditCard, Check, Loader2, Plus, CheckCircle2, Clock, Infinity as InfinityIcon, Sparkles, ShieldCheck } from "lucide-react";
+import { PageHeader, TH } from "@/components/PageHeader";
 import { toast } from "sonner";
 import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
 import { useBilling, PLAN_FEATURES, money } from "@/lib/billing";
@@ -61,7 +62,7 @@ const PlanCard = ({ p, s, ready, onChoose, busy }) => {
   const current = s.plan === p.key && s.active;
   const popular = p.key === "pro";
   return (
-    <div className={`relative flex flex-col rounded-2xl border bg-card p-6 card-shadow ${popular ? "border-primary/60" : "border-border"}`} data-testid={`plan-card-${p.key}`}>
+    <div className={`relative flex flex-col rounded-2xl border bg-card p-6 card-shadow transition-[transform,border-color] duration-200 hover:-translate-y-0.5 ${popular ? "border-primary/60 ring-1 ring-primary/20" : "border-border hover:border-primary/30"}`} data-testid={`plan-card-${p.key}`}>
       {popular && <span className="absolute -top-3 left-6 rounded-full bg-brand px-3 py-1 text-[11px] font-bold text-white flex items-center gap-1"><Sparkles className="h-3 w-3" />Most popular</span>}
       <p className="font-display text-lg font-semibold">{p.name}</p>
       <p className="mt-2"><span className="font-display text-4xl font-extrabold">${p.price}</span><span className="text-muted-foreground text-sm"> / month</span></p>
@@ -105,27 +106,39 @@ const PayDialog = ({ inv, onClose, onPaid }) => {
     return () => clearInterval(t);
   }, [cur.status, inv.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const expired = cur.status === "expired" || (cur.status === "pending" && left === 0);
+  const auto = cur.mode === "relay";
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm" data-testid="billing-pay-dialog">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><QrCode className="h-5 w-5 text-rose-600" /> Pay with Bakong KHQR</DialogTitle>
-          <DialogDescription>{cur.item_name} · <b className="text-foreground">{money(cur.amount, cur.currency, cur.price_usd)}</b> · invoice {cur.number}</DialogDescription>
+      <DialogContent className="max-w-sm p-0 overflow-hidden gap-0" data-testid="billing-pay-dialog">
+        <DialogHeader className="px-6 pt-6 pb-4 text-left">
+          <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">Invoice {cur.number}</p>
+          <DialogTitle className="font-display text-xl tracking-tight">Complete your payment</DialogTitle>
+          <DialogDescription className="flex items-baseline justify-between gap-3 pt-1">
+            <span>{cur.item_name}</span><b className="font-display text-lg text-foreground" data-testid="billing-pay-amount">{money(cur.amount, cur.currency, cur.price_usd)}</b>
+          </DialogDescription>
         </DialogHeader>
         {cur.status === "paid" ? (
-          <div className="py-6 text-center space-y-2" data-testid="billing-pay-success">
+          <div className="px-6 pb-8 pt-4 text-center space-y-2" data-testid="billing-pay-success">
             <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-500" />
             <p className="font-display text-lg font-semibold">Payment received</p>
-            <p className="text-sm text-muted-foreground">Thank you! Your plan is updated.</p>
+            <p className="text-sm text-muted-foreground">Thank you! Your plan is now active.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className={`rounded-2xl bg-white p-3 ${expired ? "opacity-30" : ""}`}><img src={`${BACKEND_URL}/api/billing/invoices/${cur.id}/qr.png`} alt="KHQR" className="w-full" data-testid="billing-pay-qr" /></div>
-            <p className="text-sm text-center flex items-center justify-center gap-1.5" data-testid="billing-pay-countdown">
-              <Clock className="h-4 w-4 text-muted-foreground" />{expired ? "This QR has expired. Close and choose the plan again." : `Valid for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} · scan with ABA, ACLEDA, Wing or any bank app`}
-            </p>
+          <div className="px-6 pb-6 space-y-4">
+            <div className={`rounded-2xl bg-white p-3 ring-1 ring-black/5 ${expired ? "opacity-30" : ""}`}><img src={`${BACKEND_URL}/api/billing/invoices/${cur.id}/qr.png`} alt="KHQR" className="w-full" data-testid="billing-pay-qr" /></div>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/60 px-4 py-2.5 text-sm" data-testid="billing-pay-countdown">
+              {expired ? <span className="text-muted-foreground">This QR has expired. Close it and choose the plan again.</span> : <>
+                <span className="flex items-center gap-2 font-medium">{auto ? <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span> : <Clock className="h-4 w-4 text-muted-foreground" />}{auto ? "Waiting for payment" : "QR valid"}</span>
+                <span className="font-mono text-muted-foreground">{Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}</span>
+              </>}
+            </div>
+            {!expired && <ol className="space-y-1.5 text-xs text-muted-foreground" data-testid="billing-pay-steps">
+              <li><b className="text-foreground">1.</b> Open ABA, ACLEDA, Wing or any bank app that accepts KHQR</li>
+              <li><b className="text-foreground">2.</b> Scan this QR and confirm the amount</li>
+              <li><b className="text-foreground">3.</b> {auto ? "Your plan turns on here automatically within seconds" : "We confirm the payment and turn your plan on"}</li>
+            </ol>}
             {cur.deeplink && !expired && <a href={cur.deeplink} className="block w-full rounded-full btn-brand py-2.5 text-center text-sm font-semibold" data-testid="billing-pay-deeplink">Open in my bank app</a>}
-            <p className="text-xs text-muted-foreground text-center">{cur.mode === "relay" ? "This window updates by itself after you pay." : "After you pay, Replyflow AI confirms it and your plan turns on (usually within a few hours)."}</p>
+            <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />Secure payment with Bakong KHQR</p>
           </div>
         )}
       </DialogContent>
@@ -136,12 +149,12 @@ const PayDialog = ({ inv, onClose, onPaid }) => {
 const History = ({ invoices }) => invoices.length > 0 && (
   <div className="rounded-2xl border border-border bg-card overflow-x-auto card-shadow">
     <table className="w-full text-sm min-w-[520px]" data-testid="billing-history">
-      <thead className="text-xs text-muted-foreground text-left"><tr><th className="px-5 py-3">Invoice</th><th className="px-5 py-3">Item</th><th className="px-5 py-3">Amount</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Date</th></tr></thead>
+      <thead className="bg-muted/40 text-left"><tr><th className={TH}>Invoice</th><th className={TH}>Item</th><th className={TH}>Amount</th><th className={TH}>Status</th><th className={TH}>Date</th></tr></thead>
       <tbody>
         {invoices.map((i) => (
-          <tr key={i.id} className="border-t border-border/60" data-testid={`billing-invoice-${i.id}`}>
-            <td className="px-5 py-3 font-mono text-xs">{i.number}</td><td className="px-5 py-3">{i.item_name}</td><td className="px-5 py-3">{money(i.amount, i.currency, i.price_usd)}</td>
-            <td className="px-5 py-3"><Pill cls={STATUS[i.status] || STATUS.expired}>{i.status}</Pill></td><td className="px-5 py-3 text-muted-foreground">{day(i.created_at)}</td>
+          <tr key={i.id} className="border-t border-border/60 hover:bg-muted/30 transition-colors" data-testid={`billing-invoice-${i.id}`}>
+            <td className="px-5 py-3 font-mono text-xs">{i.number}</td><td className="px-5 py-3">{i.item_name}</td><td className="px-5 py-3 font-semibold">{money(i.amount, i.currency, i.price_usd)}</td>
+            <td className="px-5 py-3"><Pill cls={STATUS[i.status] || STATUS.expired}>{i.status[0].toUpperCase() + i.status.slice(1)}</Pill></td><td className="px-5 py-3 text-muted-foreground">{day(i.created_at)}</td>
           </tr>
         ))}
       </tbody>
@@ -166,10 +179,7 @@ export default function BillingPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        <div>
-          <h1 className="font-display text-3xl font-bold flex items-center gap-3"><CreditCard className="h-7 w-7 text-primary" /> Billing</h1>
-          <p className="text-sm text-muted-foreground mt-1">Your plan, AI replies used this month, and payments by Bakong KHQR.</p>
-        </div>
+        <PageHeader eyebrow="Account" title="Billing" Icon={CreditCard} desc="Your plan, AI replies used this month, and payments by Bakong KHQR." />
         <CurrentPlan s={s} topup={topup} canTopup={ready && s.active && s.plan !== "trial"} onBuy={() => buy("topup")} busy={busy === "topup"} />
         {!owner && <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" data-testid="billing-owner-only">Only the shop owner can buy a plan or extra replies.</p>}
         {owner && !s.exempt && !ready && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200" data-testid="billing-not-ready">Online payment isn&apos;t set up yet. Please contact Replyflow AI to choose a plan.</p>}

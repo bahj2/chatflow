@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { Receipt, Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg } from "@/lib/auth";
@@ -68,13 +69,9 @@ export default function OrdersPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto px-6 lg:px-10 py-8 space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Receipt className="h-6 w-6 text-emerald-600 dark:text-emerald-400" /> Orders</h1>
-            <p className="text-sm text-muted-foreground mt-1">Orders the AI created, each with a Bakong KHQR for the exact total.</p>
-          </div>
+        <PageHeader eyebrow="Sales" title="Orders" Icon={Receipt} desc="Orders the AI created, each with a Bakong KHQR for the exact total.">
           {paid.length > 0 && <p className="text-xs text-muted-foreground" data-testid="orders-paid-count">{paid.length} paid in this list</p>}
-        </div>
+        </PageHeader>
         <div className="flex flex-wrap gap-1" data-testid="orders-filters">
           {FILTERS.map(([v, l]) => (
             <button key={v || "all"} onClick={() => setFilter(v)} data-testid={`orders-filter-${v || "all"}`}

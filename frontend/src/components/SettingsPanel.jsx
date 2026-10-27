@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Save, Sparkles, Loader2, Lock } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { Plus, Trash2, Save, Sparkles, Loader2, Lock, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errMsg, useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,8 @@ import { ProNote } from "@/components/ProLock";
 import { useBilling } from "@/lib/billing";
 
 export const Section = ({ title, desc, children }) => (
-  <section className="grid lg:grid-cols-[240px_1fr] gap-4 lg:gap-8 py-5">
-    <div className="lg:pt-5"><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground mt-1 leading-relaxed">{desc}</p></div>
+  <section className="grid lg:grid-cols-[250px_1fr] gap-4 lg:gap-10 py-7 border-b border-border/50 last:border-b-0">
+    <div className="lg:pt-1"><h2 className="font-display text-base md:text-lg font-semibold tracking-tight">{title}</h2><p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{desc}</p></div>
     <div className="space-y-4 min-w-0 rounded-2xl border border-border bg-card p-5 sm:p-6 card-shadow">{children}</div>
   </section>
 );
@@ -93,13 +94,12 @@ export default function SettingsPanel() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between gap-4">
-          <div><h1 className="font-display text-3xl font-bold">AI Settings</h1><p className="text-sm text-muted-foreground mt-1">Teach the AI about your business.</p></div>
+        <PageHeader eyebrow="Setup" title="AI Settings" Icon={Settings2} desc="Teach the AI about your business: what you sell, how you talk and who can help.">
           <button onClick={save} disabled={saving} data-testid="save-settings-btn"
             className="inline-flex items-center gap-2 rounded-full btn-brand px-5 py-2.5 text-sm font-semibold disabled:opacity-60">
-            <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
+            <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save changes"}
           </button>
-        </div>
+        </PageHeader>
 
         <Section title="Business" desc="What you do, what you sell, prices, hours, delivery, policies.">
           <div className="grid sm:grid-cols-2 gap-4">
