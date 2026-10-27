@@ -140,7 +140,8 @@ export default function SettingsPanel() {
         </Section>
 
         {pro === false ? <Locked title="Notion knowledge" desc="Let the AI read your Notion pages — shop info, FAQs, prices and policies." what="Notion knowledge" testid="pro-lock-notion" />
-          : <NotionSection Section={Section} />}
+          : owner ? <NotionSection Section={Section} />
+          : <Section title="Notion knowledge" desc="Let the AI read your Notion pages."><OwnerOnly testid="owner-only-notion" /></Section>}
 
         {owner ? <PaymentsSection s={s} setS={setS} Section={Section} Field={Field} />
           : <Section title="Bakong KHQR payments" desc="Where customers' order payments go."><OwnerOnly testid="owner-only-payments" /></Section>}
@@ -182,7 +183,7 @@ export default function SettingsPanel() {
 
         {pro === false ? <Locked title="Voice" desc="The AI understands customers' voice messages (incl. Khmer) and answers them in text on your plan." testid="pro-lock-voice"
           text="Voice replies and the seller voice clone are included in the Pro and Business plans." />
-          : <VoiceSection s={s} setS={setS} Section={Section} Field={Field} />}
+          : <VoiceSection owner={owner} s={s} setS={setS} Section={Section} Field={Field} />}
 
         <Section title="AI behaviour" desc="Model, tone and language for every reply.">
           <div className="grid sm:grid-cols-3 gap-4">

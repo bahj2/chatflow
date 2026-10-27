@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import billing as B
 import media as M
-from core import db, logger, get_settings, current_user, require_pro
+from core import db, logger, get_settings, current_user, owner_only, require_pro
 
 router = APIRouter(prefix="/api")
 
@@ -15,7 +15,7 @@ class VoiceTestIn(BaseModel):
     voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]] = None
 
 @router.post("/settings/seller-voice")
-async def seller_voice(file: UploadFile = File(...), text: str = Form("", max_length=500), user=Depends(current_user)):
+async def seller_voice(file: UploadFile = File(...), text: str = Form("", max_length=500), user=Depends(owner_only)):
     await require_pro(user["business_id"])
     data = await file.read()
     if not data or len(data) > 10 * 1024 * 1024:
@@ -40,7 +40,7 @@ async def seller_voice(file: UploadFile = File(...), text: str = Form("", max_le
 
 
 @router.delete("/settings/seller-voice")
-async def delete_seller_voice(user=Depends(current_user)):
+async def delete_seller_voice(user=Depends(owner_only)):
     await db.settings.update_one({"business_id": user["business_id"]}, {"$set": {"seller_voice_media_id": "", "seller_voice_text": ""}})
     return {"ok": True}
 

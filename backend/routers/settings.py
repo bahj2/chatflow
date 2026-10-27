@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api")
 
 # Payment account, channel keys and team list: only the shop owner may see the secrets or change these.
 OWNER_FIELDS = ("allowed_emails", "telegram_token", "fb_page_token", "fb_app_secret", "fb_verify_token",
-                "bakong_account_id", "bakong_merchant_name", "bakong_city", "khqr_token")
+                "bakong_account_id", "bakong_merchant_name", "bakong_city", "khqr_token", "seller_voice_text")
 SECRET_FIELDS = ("telegram_token", "fb_page_token", "fb_app_secret", "fb_verify_token", "khqr_token")
 
 

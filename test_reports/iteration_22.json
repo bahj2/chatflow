@@ -1,0 +1,38 @@
+{
+  "summary": "Backend + frontend tested after env fix and teammate (member) security work. Backend responds; Landing, /login and /signup load. Admin login works and shows the Businesses page. Tested: signup, saving AI Settings, AI tester (real LLM reply), admin Set plan Pro, 402 when adding a teammate on trial, member secrets blanked, member PUT keeping owner fields, owner-only endpoints returning 403, removing a member (401 on API calls, 403 on login, UI sends user back to /login with the message), Starter downgrade blocking the member, token_version invalidation, and the 11th signup getting 429 from the Mongo rate limit. New pytest: 14/14 pass. iter21 regression: 28/28 pass. UI owner/member views are correct. Problems found: 2 medium UI issues (Notion connect shown to members; unhandled promise rejections when a session is kicked).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "core.rate_ok", "issue": "Count-then-insert is not atomic, so parallel sign-ups can go a little past the 10/hour limit. The register handler also counts attempts that later fail (duplicate email). Low impact."},
+      {"endpoint": "POST /api/billing/checkout, /api/settings/seller-voice", "issue": "Not owner_only, so a member can start plan purchases and change the seller voice clone. Decide whether that is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "NotionSection (AI Settings, member view)", "issue": "Members still see the Notion secret input and Connect/Disconnect buttons, but the backend returns 403 'Only the shop owner can do this.' Show OwnerOnly or hide them for role==='member', like payments and team.", "selector": "Notion knowledge section", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Member kicked (removed or plan dropped) while on the dashboard", "issue": "The redirect to /login with the login-error message works. But ProductsPanel load() has no .catch, so the 401 becomes an unhandled promise rejection (2x) and the Emergent overlay covers the login page, blocking the Sign in button in preview. The same pattern (no .catch) is in Inbox.jsx:165/249/256, ChannelsPanel.jsx:41-42, OrdersPanel.jsx:61, SettingsPanel.jsx:76, AdminPanel.jsx:19, AdminBilling.jsx:73.", "affected_selectors": ["[data-testid='login-submit-btn']", "[data-testid='nav-products']"]}
+    ],
+    "design_issues": [
+      {"screen": "Dashboard mobile 390px (admin)", "issues": ["The top icon nav scrolls sideways with no visual hint. The Inbox/Businesses icons drop out of view after navigating (minor)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter22_team_security.py", "/app/backend/tests/seed_iter22_ui.py", "/app/test_reports/pytest/pytest_iter22.xml"],
+  "action_items": [
+    "Add .catch handlers to api.get(...).then loaders (ProductsPanel, Inbox, ChannelsPanel, OrdersPanel, SettingsPanel, AdminPanel, AdminBilling) so 401 kicks don't cause unhandled rejections.",
+    "NotionSection: show OwnerOnly or hide the connect/disconnect controls for members.",
+    "Decide whether members may use billing checkout and seller-voice upload/delete. If not, make them owner_only."
+  ],
+  "critical_code_review_comments": [
+    "rate_ok is not atomic (count_documents, then insert_many). Fine for abuse protection, but not strict.",
+    "register calls rate_ok before the duplicate-email check, so failed attempts use up the limit.",
+    "member_problem uses sorted allowed_emails to decide which members fit the plan seat limit. After a downgrade, which teammates keep access depends on alphabetical order. Acceptable, but undocumented."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter22_team_security.py", "/app/backend/tests/seed_iter22_ui.py"],
+  "success_rate": {"backend": "100% (14/14 new + 28/28 iter21 regression)", "frontend": "~90% (all flows work; Notion member UI and unhandled rejections are open)"},
+  "seed_data_creation": "Test shops/members were created and then fully cleaned up. db.rate_hits and db.login_attempts were cleared. The DB now holds only the admin user and business.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: pytest tests/test_iter22_team_security.py -n 0 (it clears db.rate_hits itself; the signup rate-limit test runs last and cleans up). For UI: python tests/seed_iter22_ui.py creates owner test_uiowner22@example.com/secret123 (Pro) + member test_uimember22@example.com/member123. Run with the 'cleanup' arg to remove them. POST /api/ai/test body is {text}."
+}

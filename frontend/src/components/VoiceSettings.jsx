@@ -98,7 +98,7 @@ const SellerVoice = ({ s, setS }) => {
   );
 };
 
-export const VoiceSection = ({ s, setS, Section, Field }) => (
+export const VoiceSection = ({ s, setS, Section, Field, owner = true }) => (
   <Section title="Voice" desc="Customers can send voice messages. The AI understands them (incl. Khmer) and answers with voice.">
     <div className="flex items-center justify-between rounded-xl border border-border bg-muted/40 p-4">
       <div><p className="font-medium text-sm">Reply with voice to voice messages</p><p className="text-xs text-muted-foreground">Typed messages always get text replies.</p></div>
@@ -121,7 +121,8 @@ export const VoiceSection = ({ s, setS, Section, Field }) => (
         </p>
       </div>
       <Preview s={s} text="សួស្តីបង! អរគុណដែលបានទាក់ទងមកហាងយើងខ្ញុំ។ តើខ្ញុំអាចជួយអ្វីបានដែរ?" label="Test Khmer voice" testid="khmer-preview-btn" />
-      <SellerVoice s={s} setS={setS} />
+      {owner ? <SellerVoice s={s} setS={setS} />
+        : <p className="border-t border-border pt-4 text-sm text-muted-foreground" data-testid="owner-only-seller-voice">Only the shop owner can record or change the seller’s voice clone.</p>}
     </div>
   </Section>
 );

@@ -59,10 +59,10 @@ async def register(body: RegisterIn, request: Request):
     email = body.email.strip().lower()
     if not re.fullmatch(EMAIL_RE, email):
         raise HTTPException(400, "Please enter a valid email")
-    if not await rate_ok([(f"reg:{client_ip(request)}", 10, 3600)]):
-        raise HTTPException(429, "Too many sign-ups from this network. Try again later.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "An account with this email already exists. Please sign in.")
+    if not await rate_ok([(f"reg:{client_ip(request)}", 10, 3600)]):
+        raise HTTPException(429, "Too many sign-ups from this network. Try again later.")
     uid = str(uuid.uuid4())
     bid = await create_business(body.business_name.strip(), uid)
     user = {"id": uid, "email": email, "name": body.business_name.strip(), "password_hash": hash_pw(body.password),

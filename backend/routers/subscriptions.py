@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 import billing as B
 import payments as P
-from core import db, current_user, superadmin, platform_settings
+from core import db, current_user, owner_only, superadmin, platform_settings
 
 router = APIRouter(prefix="/api")
 
@@ -35,7 +35,7 @@ async def billing(user=Depends(current_user)):
 
 
 @router.post("/billing/checkout")
-async def billing_checkout(body: CheckoutIn, user=Depends(current_user)):
+async def billing_checkout(body: CheckoutIn, user=Depends(owner_only)):
     return await B.checkout(db, user["business_id"], body.item, await platform_settings())
 
 

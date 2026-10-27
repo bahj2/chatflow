@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Check, Loader2, Plus, QrCode, CheckCircle2, Clock, Infinity as InfinityIcon, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { api, errMsg, BACKEND_URL } from "@/lib/auth";
+import { api, errMsg, BACKEND_URL, useAuth } from "@/lib/auth";
 import { useBilling, PLAN_FEATURES } from "@/lib/billing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -151,11 +151,14 @@ const History = ({ invoices }) => invoices.length > 0 && (
 
 export default function BillingPanel() {
   const { billing, refresh } = useBilling();
+  const { user } = useAuth();
+  const owner = user?.role !== "member";
   const [busy, setBusy] = useState("");
   const [inv, setInv] = useState(null);
   useEffect(() => { refresh(); }, [refresh]);
   if (!billing) return <div className="p-8 text-muted-foreground">Loading…</div>;
-  const { sub: s, plans, topup, payments_ready: ready, invoices } = billing;
+  const { sub: s, plans, topup, invoices } = billing;
+  const ready = billing.payments_ready && owner;
   const buy = async (item) => {
     setBusy(item);
     try { setInv((await api.post("/billing/checkout", { item })).data); } catch (e) { toast.error(errMsg(e)); } finally { setBusy(""); }
@@ -168,7 +171,8 @@ export default function BillingPanel() {
           <p className="text-sm text-muted-foreground mt-1">Your plan, AI replies used this month, and payments by Bakong KHQR.</p>
         </div>
         <CurrentPlan s={s} topup={topup} canTopup={ready && s.active && s.plan !== "trial"} onBuy={() => buy("topup")} busy={busy === "topup"} />
-        {!s.exempt && !ready && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200" data-testid="billing-not-ready">Online payment isn&apos;t set up yet. Please contact Replyflow AI to choose a plan.</p>}
+        {!owner && <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" data-testid="billing-owner-only">Only the shop owner can buy a plan or extra replies.</p>}
+        {owner && !s.exempt && !ready && <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200" data-testid="billing-not-ready">Online payment isn&apos;t set up yet. Please contact Replyflow AI to choose a plan.</p>}
         <div className="grid md:grid-cols-3 gap-5 pt-2">
           {plans.map((p) => <PlanCard key={p.key} p={p} s={s} ready={ready} onChoose={buy} busy={busy === p.key} />)}
         </div>

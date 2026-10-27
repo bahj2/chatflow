@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem("rf_token");
         sessionStorage.setItem("rf_notice", errMsg(e));
         setUser(false);
+        return new Promise(() => {}); // leaving the dashboard: let pending screens wait quietly instead of erroring
       }
       return Promise.reject(e);
     });
