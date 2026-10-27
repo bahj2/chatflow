@@ -140,7 +140,12 @@ export default function Landing() {
       <footer className="border-t border-border/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-display font-bold"><BrandMark className="h-7 w-7" />{BRAND}</div>
-          <p className="text-sm text-muted-foreground" data-testid="footer-copyright">© {new Date().getFullYear()} ReplyFlow</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            <Link to="/privacy" className="hover:text-foreground" data-testid="footer-privacy">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground" data-testid="footer-terms">Terms</Link>
+            <Link to="/data-deletion" className="hover:text-foreground" data-testid="footer-data-deletion">Data deletion</Link>
+            <p data-testid="footer-copyright">© {new Date().getFullYear()} ReplyFlow</p>
+          </div>
         </div>
       </footer>
     </div>
