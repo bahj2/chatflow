@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, Gift, PlayCircle } from "lucide-react";
 import { PLAN_FEATURES } from "@/lib/billing";
@@ -38,6 +39,27 @@ export const Pricing = () => (
     <p className="mt-5 text-xs text-muted-foreground">Voice replies to voice messages and the seller voice clone are in the paid Pro and Business plans.</p>
   </section>
 );
+
+export const StickyTrial = () => {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const on = () => {
+      const nearEnd = window.innerHeight + window.scrollY > document.documentElement.scrollHeight - 420;
+      setShow(window.scrollY > 480 && !nearEnd);
+    };
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return (
+    <div className={`md:hidden fixed inset-x-0 bottom-0 z-40 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-background/90 backdrop-blur-xl border-t border-border transition-[transform,opacity] duration-300 ${show ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"}`} data-testid="sticky-trial-bar">
+      <Link to="/signup" className="flex w-full items-center justify-center gap-2 rounded-full btn-brand py-3.5 font-semibold" data-testid="sticky-trial-btn">
+        Start 14-day free trial <ArrowRight className="h-4 w-4" />
+      </Link>
+      <p className="mt-1.5 text-center text-[11px] text-muted-foreground">No payment needed · 200 AI replies</p>
+    </div>
+  );
+};
 
 export const TourVideo = ({ className = "" }) => (
   <video src={TOUR_VIDEO} controls playsInline preload="metadata" poster="/videos/replyflow-tour.jpg" className={`w-full rounded-2xl bg-black ${className}`} data-testid="tour-video" />

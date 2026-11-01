@@ -3,7 +3,7 @@ import { ArrowRight, Send, Facebook, QrCode, Brain, Hand, Sparkles, Mic, ImageIc
 import { BrandMark, BRAND } from "@/components/Brand";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TelegramDemo } from "@/components/TelegramDemo";
-import { Pricing, VideoSection } from "@/components/LandingPricing";
+import { Pricing, VideoSection, StickyTrial } from "@/components/LandingPricing";
 
 const FEATURES = [
   { Icon: Send, color: "#229ED9", t: "Telegram bot", d: "Paste your BotFather token, click connect. Every message gets an instant reply.", span: "lg:col-span-2" },
@@ -143,6 +143,7 @@ export default function Landing() {
       <VideoSection />
       <Pricing />
       <Cta />
+      <StickyTrial />
       <footer className="border-t border-border/60">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-display font-bold"><BrandMark className="h-7 w-7" />{BRAND}</div>
