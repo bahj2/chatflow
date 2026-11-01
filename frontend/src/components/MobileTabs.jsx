@@ -49,7 +49,7 @@ export const MobileTabs = ({ admin, onTutorial, onLogout }) => {
         </div>
       </nav>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl border-border bg-card px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3" data-testid="mobile-more-sheet">
+        <SheetContent side="bottom" onOpenAutoFocus={(e) => e.preventDefault()} className="rounded-t-3xl border-border bg-card px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3" data-testid="mobile-more-sheet">
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-muted" />
           <SheetHeader className="px-4 pb-1 text-left"><SheetTitle className="font-display">More</SheetTitle></SheetHeader>
           <div className="space-y-0.5">

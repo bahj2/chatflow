@@ -13,7 +13,7 @@ const PILL = {
 export const StockPill = ({ p }) => {
   const st = stockState(p);
   const [label, cls] = PILL[st];
-  return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`} data-testid={`product-stock-${p.id}`}>{label || `${p.stock} in stock`}</span>;
+  return <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`} data-testid={`product-stock-${p.id}`}>{label || `${p.stock} in stock`}</span>;
 };
 
 export const StockStepper = ({ p, onSet }) => (

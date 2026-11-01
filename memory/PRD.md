@@ -284,3 +284,9 @@ FastAPI + MongoDB (settings, conversations, messages, users) · emergentintegrat
 - Frontend: /forgot-password (2 steps, 60s resend cooldown, strength meter); "Forgot password?" link on the login page.
 - Live app redeployed at https://www.replyflowai.net (the "Network Error" was fixed by the rebuild).
 - Tested in iteration_31 (100%).
+
+## Iteration 37 (2026-11) — Mobile
+- Dashboard on phones: bottom tab bar (Inbox/Products/Orders/Settings/More) in components/MobileTabs.jsx; More sheet holds Channels, Billing (plan subtitle), Businesses (admin), Watch tutorial, Website, Log out. The tab bar is a flex child (h-[100dvh]), so it never covers content. The sidebar is unchanged on md+.
+- Landing: sticky "Start 14-day free trial" bar on mobile (StickyTrial in LandingPricing.jsx); shows after the hero, hides near the page end.
+- Tested in iteration_32 (100%); both small design notes are fixed.
+- Ideas the user didn't pick (backlog): website menu button, 16px inputs (no iOS zoom), card layout for tables, horizontally scrolling settings tabs, compact page headers.

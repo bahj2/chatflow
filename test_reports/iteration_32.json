@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only test of the mobile changes (dashboard bottom tab bar and the landing page's sticky trial bar) at 390x844 and 1920x800. All requested flows pass. Mobile dashboard (tour shop): the old icon nav and the sidebar items (nav-*, logout-btn, nav-tutorial-btn, plan chip, business card) are hidden. The top bar shows the logo, 'Sokha Fashion' (dash-business-name-mobile) and the theme toggle. The tab bar shows Inbox/Products/Orders/Settings/More with labels, each tab goes to the right route and the active tab is highlighted. More sheet: Channels and Billing ('Free trial · 10 days left') navigate and close the sheet, and the More tab is highlighted on /channels, /billing and /businesses. Watch tutorial opens tutorial-dialog with a video. Website has href='/' target=_blank. Log out goes to /login. Superadmin: Businesses shows in the sheet (Billing subtitle 'Platform · unlimited') and the top bar shows 'Replyflow AI'. The tab bar is a flex child, not fixed, so it never covers content: the reply input and send button sit above it (y 702-768 vs bar top 784, elementFromPoint hit OK), the last product card scrolls fully above it, the end of the settings page and the billing Choose plan buttons are reachable, and scrollWidth is 390 on every page. Desktop 1920x800: tab bar hidden, all sidebar links incl. businesses work, tutorial button and logout work. Landing at 390: sticky bar hidden at y=0 and y=300, shown at y=1500, hidden at the page bottom (final CTA/footer), click goes to /signup, never visible on desktop. No page errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile Products grid (390px)", "issues": ["Stock pill ('8 in stock', '1 in stock') wraps onto 2 lines next to the -/+ stepper; consider whitespace-nowrap or a shorter label. Cosmetic, likely there before this change."]},
+      {"screen": "Mobile More sheet", "issues": ["When the sheet opens, focus lands on the last row ('Log out' gets a highlighted background), so the destructive action looks pre-selected. Consider putting initial focus on the sheet itself or the first row."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: add whitespace-nowrap to the stock pill on mobile product cards",
+    "Optional: stop 'Log out' looking focused when the More sheet opens (onOpenAutoFocus / focus the first row)"
+  ],
+  "critical_code_review_comments": [
+    "StickyTrial hide-near-end uses a fixed 420px; with the current layout this hides it as the final CTA comes into view, which works, but it is tied to CTA and footer height. An IntersectionObserver on the final CTA would hold up better.",
+    "The MobileTabs 'inMore' regex includes businesses, which is correct; for non-admins /dashboard/businesses redirects anyway."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None. Only navigation; no plans bought, no messages sent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Mobile tab bar uses md:hidden (shown under 768px). Testids: mobile-tabbar, tab-inbox/products/orders/settings/more, mobile-more-sheet, more-channels/billing/businesses/tutorial/website/logout, dash-business-name-mobile, sticky-trial-bar/btn. Creds: tour@replyflow.com / TourDemo2026!, admin@replyflow.com / admin123."
+}

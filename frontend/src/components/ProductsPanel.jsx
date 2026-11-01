@@ -101,7 +101,7 @@ const ProductCard = ({ p, onEdit, onDelete, onStock }) => (
     <div className="p-3 space-y-2">
       <p className="text-sm font-semibold leading-snug line-clamp-2">{p.name}</p>
       {p.price && <p className="text-sm text-primary font-bold">{p.price}</p>}
-      <div className="flex items-center justify-between gap-2"><StockPill p={p} />{p.stock != null && <StockStepper p={p} onSet={onStock} />}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><StockPill p={p} />{p.stock != null && <StockStepper p={p} onSet={onStock} />}</div>
     </div>
   </div>
 );
